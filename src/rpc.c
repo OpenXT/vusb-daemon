@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2014 Citrix Systems, Inc.
  * Copyright (c) 2015 Jed Lejosne <lejosnej@ainfosec.com>
  *
  * This program is free software; you can redistribute it and/or modify

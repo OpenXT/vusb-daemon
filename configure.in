@@ -1,0 +1,220 @@
+dnl
+dnl
+dnl configure.in.head:
+dnl
+dnl $Id:$
+dnl
+dnl $Log:$
+dnl
+dnl
+dnl
+AC_PREREQ(2.13)
+AC_INIT(src/main.c)
+
+AC_PROG_CC
+AC_PROG_CPP
+AC_PROG_INSTALL
+AC_PROG_LN_S
+AC_PROG_MAKE_SET
+AC_PROG_RANLIB
+AC_PROG_AWK
+AC_CHECK_PROG(TAR,tar,tar)
+AC_CHECK_PROG(GZIP,gzip,gzip)
+AC_CHECK_PROG(MD5SUM,md5sum,md5sum)
+AC_CHECK_PROG(GREP,grep,grep)
+
+AC_SYS_LARGEFILE
+
+VUSBDAEMON_MAJOR_VERSION=1
+VUSBDAEMON_MINOR_VERSION=0
+VUSBDAEMON_MICRO_VERSION=1
+
+
+VUSBDAEMON_MAJOR_VERSION=$VUSBDAEMON_MAJOR_VERSION.$VUSBDAEMON_MINOR_VERSION.$VUSBDAEMON_MICRO_VERSION
+
+AC_SUBST(VUSBDAEMON_MAJOR_VERSION)
+AC_SUBST(VUSBDAEMON_MINOR_VERSION)
+AC_SUBST(VUSBDAEMON_MICRO_VERSION)
+AC_SUBST(VUSBDAEMON_VERSION)
+
+
+VERSION=$VUSBDAEMON_VERSION
+PACKAGE=vusb-daemon
+
+AM_INIT_AUTOMAKE($PACKAGE,$VERSION)
+
+
+AM_CONFIG_HEADER(src/config.h)
+
+# Checks for header files.
+AC_CHECK_HEADERS([malloc.h])
+AC_HEADER_STDC
+AC_FUNC_MALLOC
+
+AC_C_INLINE
+AC_C_CONST
+
+PKG_CHECK_MODULES([LIBUSB], [libusb])
+PKG_CHECK_MODULES([DBUS],[dbus-1])
+PKG_CHECK_MODULES([DBUS_GLIB],[dbus-glib-1])
+PKG_CHECK_MODULES([LIBV4V],[libv4v])
+PKG_CHECK_MODULES([UDEV],[libudev])
+PKG_CHECK_MODULES([LIBXCXENSTORE],[libxcxenstore])
+
+LIBV4V_CONFIG=no
+AC_ARG_WITH(libv4v,
+        AC_HELP_STRING([--with-libv4v=PATH],[Path to libv4v-config]),
+                LIBV4V_CONFIG=$with_libv4v,LIBV4V_CONFIG=no)
+
+case "x$LIBV4V_CONFIG" in
+        xno)
+                AC_PATH_PROG(LIBV4V_CONFIG, libv4v-config, no)
+        ;;
+        x|xyes)
+                AC_PATH_PROG(LIBV4V_CONFIG, libv4v-config, no)
+        ;;
+        *)
+        ;;
+esac
+
+if ! test -x $LIBV4V_CONFIG; then
+  PKG_CHECK_MODULES([LIBV4V], [libv4v])
+  LIBV4V_INC="$LIBV4V_CFLAGS"
+  LIBV4V_LIB="$LIBV4V_LIBS"
+else
+ LIBV4V_INC=`$LIBV4V_CONFIG --cflags`
+ LIBV4V_LIB=`$LIBV4V_CONFIG --libs`
+fi
+
+AC_SUBST(LIBV4V_INC)
+AC_SUBST(LIBV4V_LIB)
+
+LIBXCDBUS_CONFIG=no
+AC_ARG_WITH(libxcdbus,
+        AC_HELP_STRING([--with-libxcdbus=PATH],[Path to libxcdbus-config]),
+                LIBXCDBUS_CONFIG=$with_libxcdbus,LIBXCDBUS_CONFIG=no)
+
+case "x$LIBXCDBUS_CONFIG" in
+        xno)
+                AC_PATH_PROG(LIBXCDBUS_CONFIG, libxcdbus-config, no)
+        ;;
+        x|xyes)
+                AC_PATH_PROG(LIBXCDBUS_CONFIG, libxcdbus-config, no)
+        ;;
+        *)
+        ;;
+esac
+
+if ! test -x $LIBXCDBUS_CONFIG; then
+  PKG_CHECK_MODULES([LIBXCDBUS], [libxcdbus])
+  LIBXCDBUS_INC="$LIBXCDBUS_CFLAGS"
+  LIBXCDBUS_LIB="$LIBXCDBUS_LIBS"
+else
+ LIBXCDBUS_INC=`$LIBXCDBUS_CONFIG --cflags`
+ LIBXCDBUS_LIB=`$LIBXCDBUS_CONFIG --libs`
+fi
+
+AC_SUBST(LIBXCDBUS_INC)
+AC_SUBST(LIBXCDBUS_LIB)
+
+
+
+
+AC_ARG_WITH(libexpat, 
+        AC_HELP_STRING([--with-libexpat=PATH],[Path to prefix where where libexpat and xen were installed]), 
+                LIBEXPAT_PREFIX=$with_libexpat,[]) 
+ 
+ 
+case "x$LIBEXPAT_PREFIX" in 
+        xno) 
+                LIBEXPAT_INC="" 
+                LIBEXPAT_LIB=-lexpat 
+                ;; 
+        xyes)  
+                LIBEXPAT_INC="" 
+                LIBEXPAT_LIB=-lexpat
+                ;; 
+        *) 
+                LIBEXPAT_INC="-I${LIBEXPAT_PREFIX}/include" 
+                LIBEXPAT_LIB="-L${LIBEXPAT_PREFIX}/lib -lexpat" 
+                ;; 
+esac 
+ 
+ 
+ORIG_LDFLAGS="${LDFLAGS}" 
+ORIG_CFLAGS="${CFLAGS}" 
+ 
+        have_libexpat=true 
+ 
+        LDFLAGS="${LDFLAGS} ${LIBEXPAT_LIB}"  
+        CFLAGS="${CFLAGS} ${LIBEXPAT_INC}"  
+ 
+        AC_CHECK_HEADERS([expat.h],[],[have_libexpat=false]) 
+        AC_CHECK_FUNC(XML_SetElementHandler,[],[have_libexpat=false]) 
+ 
+LDFLAGS="${ORIG_LDFLAGS}" 
+CFLAGS="${ORIG_CFLAGS}" 
+ 
+if [ "x$have_libexpat" != "xtrue" ]; then 
+        AC_MSG_ERROR([no expat library found])
+fi 
+ 
+AC_SUBST(LIBEXPAT_INC) 
+AC_SUBST(LIBEXPAT_LIB) 
+ 
+
+
+AC_ARG_WITH(libxenstore, 
+        AC_HELP_STRING([--with-libxenstore=PATH],[Path to prefix where where libxenstore and xen were installed]), 
+                LIBXENSTORE_PREFIX=$with_libxenstore,[]) 
+ 
+ 
+case "x$LIBXENSTORE_PREFIX" in 
+        xno) 
+                LIBXENSTORE_INC="" 
+                LIBXENSTORE_LIB=-lxenstore
+                ;; 
+        xyes)  
+                LIBXENSTORE_INC="" 
+                LIBXENSTORE_LIB=-lxenstore
+                ;; 
+        *) 
+                LIBXENSTORE_INC="-I${LIBXENSTORE_PREFIX}/include" 
+                LIBXENSTORE_LIB="-L${LIBXENSTORE_PREFIX}/lib -lxenstore" 
+                ;; 
+esac 
+ 
+ 
+ORIG_LDFLAGS="${LDFLAGS}" 
+ORIG_CFLAGS="${CFLAGS}" 
+ 
+        have_libxenstore=true 
+ 
+        LDFLAGS="${LDFLAGS} ${LIBXENSTORE_LIB}"  
+        CFLAGS="${CFLAGS} ${LIBXENSTORE_INC}"  
+ 
+        AC_CHECK_HEADERS([xs.h],[],[have_libxenstore=false]) 
+        AC_CHECK_FUNC(xs_read,[],[have_libxenstore=false]) 
+ 
+LDFLAGS="${ORIG_LDFLAGS}" 
+CFLAGS="${ORIG_CFLAGS}" 
+ 
+if [ "x$have_libxenstore" != "xtrue" ]; then 
+        AC_MSG_ERROR([no xenstore library found])
+fi 
+ 
+AC_SUBST(LIBXENSTORE_INC) 
+AC_SUBST(LIBXENSTORE_LIB) 
+
+AC_ARG_WITH(idldir,AC_HELP_STRING([--with-idldir=PATH],[Path to dbus idl desription files]),
+                IDLDIR=$with_idldir,IDLDIR=/usr/share/idl)
+
+AC_SUBST(IDLDIR)
+AC_SUBST(RPCGEN_TEMPLATES)
+
+AC_CHECK_PROG(XC_RPCGEN,xc-rpcgen,xc-rpcgen)
+
+
+AC_OUTPUT([Makefile
+	   src/Makefile])
+

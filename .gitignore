@@ -1,0 +1,4 @@
+aclocal-copy/
+config.guess
+config.sub
+src/rpcgen/

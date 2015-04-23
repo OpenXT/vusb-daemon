@@ -18,220 +18,18 @@
 
 #include "project.h"
 
-/* Ignore device configurations and interfaces */
-int
-check_sysname(char *s)
+static int
+disable_autoprobe(void)
 {
-  while (*s != '\0') {
-    if (*s == ':')
-      return -1;
-    s++;
-  }
+  int fd;
 
-  return 0;
-}
-
-/* Build a string that represents the device type
-   by finding the deepest known class/subclass/protocol.
-   This uses the structure defined in classes.h, generated from usb.ids */
-char*
-device_type(unsigned char class,
-	    unsigned char subclass,
-	    unsigned char protocol)
-{
-  const class_t *tmp = classes;
-  int n = 0;
-  int m = 0;
-  int size;
-  char *res;
-
-  /* Find the class */
-  while (tmp->value != NULL && tmp->id != class)
-    tmp++;
-  if (tmp->value == NULL)
-    return NULL;
-
-  /* Find the subclass or return the class */
-  while (tmp->subs != NULL && tmp->subs[n].value != NULL &&
-	 tmp->subs[n].id != subclass)
-    n++;
-  if (tmp->subs == NULL || tmp->subs[n].value == NULL)
-    {
-      size = strlen(tmp->value) + 1;
-      res = malloc(size);
-      snprintf(res, size, "%s", tmp->value);
-      return res;
-    }
-
-  /* Find the protocol or return the subclass */
-  while (tmp->subs[n].prots != NULL && tmp->subs[n].prots[m].value != NULL &&
-	 tmp->subs[n].prots[m].id != protocol)
-    m++;
-  if (tmp->subs[n].prots == NULL || tmp->subs[n].prots[m].value == NULL)
-    {
-      size = strlen(tmp->subs[n].value) + 1;
-      res = malloc(size);
-      snprintf(res, size, "%s", tmp->subs[n].value);
-      return res;
-    }
-
-  /* Everything was found, returning the protocol */
-  size = strlen(tmp->subs[n].prots[m].value) + 1;
-  res = malloc(size);
-  snprintf(res, size, "%s", tmp->subs[n].prots[m].value);
-
-  return res;
-}
-
-/* Add a device to the global list of devices */
-int
-add_device(int  busid,
-	   int  devid,
-	   char *shortname,
-	   char *longname)
-{
-  device_t *device;
-
-  device = malloc(sizeof(device_t));
-
-  device->busid = busid;
-  device->devid = devid;
-  device->shortname = shortname;
-  device->longname = longname;
-  device->vm = NULL;
-  list_add(&device->list, &devices.list);
-
-  return 0;
-}
-
-/* Enumerate all the udev USB devices that we care about,
-   build nice model and vendor strings and add them to the list */
-int
-fill_devices(void)
-{
-  struct udev_enumerate *enumerate;
-  struct udev *udev;
-  struct udev_list_entry *udev_device_list, *udev_device_entry;
-  struct udev_device *udev_device;
-  uint16_t vendor = 0;
-  uint16_t product = 0;
-
-  udev = udev_new();
-  if (!udev) {
-    xd_log(LOG_ERR, "Can't do udev");
+  fd = open("/sys/bus/usb/drivers_autoprobe", O_WRONLY);
+  if (fd < 0)
     return -1;
-  }
-  enumerate = udev_enumerate_new(udev);
-  udev_enumerate_add_match_subsystem(enumerate, "usb");
-  /* Sysname must start with a digit */
-  udev_enumerate_add_match_sysname(enumerate, "[0-9]*");
-  udev_enumerate_scan_devices(enumerate);
-  udev_device_list = udev_enumerate_get_list_entry(enumerate);
-  udev_list_entry_foreach(udev_device_entry, udev_device_list) {
-    const char *path;
-    const char *value;
-    int busnum;
-    int devnum;
-    char *vendor = NULL;
-    char *model;
-    char *type = NULL;
-    unsigned char class;
-    unsigned char subclass;
-    unsigned char protocol;
-    int size;
+  write(fd, "0", 1);
+  close(fd);
 
-    path = udev_list_entry_get_name(udev_device_entry);
-    udev_device = udev_device_new_from_syspath(udev, path);
-
-    /* Make sure the device is useful for us */
-    value = udev_device_get_sysname(udev_device);
-    if (value != NULL && check_sysname(value) != 0)
-      continue;
-
-    /* Check main device attributes.
-       Skip any device that doesn't have them (shouldn't happen) */
-    value = udev_device_get_sysattr_value(udev_device, "busnum");
-    if (value == NULL)
-      continue;
-    else
-      busnum = strtol(value, NULL, 10);
-    value = udev_device_get_sysattr_value(udev_device, "devnum");
-    if (value == NULL)
-      continue;
-    else
-      devnum = strtol(value, NULL, 10);
-    value = udev_device_get_sysattr_value(udev_device, "bDeviceClass");
-    if (value == NULL)
-      continue;
-    else
-      class = strtol(value, NULL, 16);
-    value = udev_device_get_sysattr_value(udev_device, "bDeviceSubClass");
-    if (value == NULL)
-      continue;
-    else
-      subclass = strtol(value, NULL, 16);
-    value = udev_device_get_sysattr_value(udev_device, "bDeviceProtocol");
-    if (value == NULL)
-      continue;
-    else
-      protocol = strtol(value, NULL, 16);
-
-    /* This is a hub, we don't do hubs. */
-    if (class == 0x09)
-      continue;
-
-    /* The devices passes all the tests, we want it in the list */
-
-    /* Get the type string for the device. 0 is not a "real" class */
-    if (class != 0)
-      type = device_type(class, subclass, protocol);
-
-    /* Using udev to look up the device vendor in usb.ids.
-       If no vendor is found in the database, ask the device itself.
-       If no vendor is found at all, the device longname will be NULL. */
-    value = udev_device_get_property_value(udev_device, "ID_VENDOR_FROM_DATABASE");
-    if (value == NULL)
-      value = udev_device_get_property_value(udev_device, "ID_VENDOR");
-    if (value != NULL) {
-      vendor = malloc(strlen(value) + 1);
-      strcpy(vendor, value);
-    }
-
-    /* Using udev to look up the device model in usb.ids.
-       If no model is found in the database, ask the device itself.
-       Use model and type to build the shortname or default to "unknown" */
-    value = udev_device_get_property_value(udev_device, "ID_MODEL_FROM_DATABASE");
-    if (value == NULL)
-      value = udev_device_get_property_value(udev_device, "ID_MODEL");
-    if (value != NULL) {
-      if (type != NULL) {
-	size = strlen(type) + 3 + strlen(value) + 1;
-	model = malloc(size);
-	snprintf(model, size, "%s - %s", value, type);
-      } else {
-	size = strlen(value) + 1;
-	model = malloc(size);
-	snprintf(model, size, "%s", value);
-      }
-    } else {
-      if (type != NULL) {
-	size = strlen(type) + 1;
-	model = malloc(size);
-	snprintf(model, size, "%s", type);
-      } else {
-	size = strlen("unknown" + 1);
-	model = malloc(size);
-	snprintf(model, size, "unknown");
-      }
-    }
-
-    /* Finally add the device */
-    add_device(busnum, devnum, model, vendor);
-  }
-
-  /* Cleanup */
-  udev_enumerate_unref(enumerate);
-  udev_unref(udev);
+  return 0;
 }
 
 int
@@ -243,6 +41,7 @@ main() {
   fd_set writefds;
   fd_set exceptfds;
   int nfds;
+  int udevfd;
 
   /* Init global VMs and devices lists */
   INIT_LIST_HEAD(&vms.list);
@@ -255,7 +54,7 @@ main() {
   list_add(&vm->list, &vms.list);
 
   /* Add the USB devices to the global device list */
-  fill_devices();
+  udev_fill_devices();
 
   /* Initialize xenstore handle in usbowls */
   ret = usbowls_xenstore_init();
@@ -267,6 +66,19 @@ main() {
 
   /* Setup the dbus server */
   rpc_init();
+
+  /* Disable driver autoprobing */
+  if (disable_autoprobe() != 0) {
+    xd_log(LOG_ERR, "Unable to disable autoprobing");
+    return -1;
+  }
+
+  /* Setup the udev monitor */
+  udevfd = udev_init();
+  if (udevfd < 0) {
+    xd_log(LOG_ERR, "Unable to initialize the udev monitor");
+    return -1;
+  }
 
   /* Main loop */
   while (1) {
@@ -281,7 +93,13 @@ main() {
     xcdbus_post_select(g_xcbus, 0, &readfds, &writefds, &exceptfds);
 
     /* Check udev */
-    /* FIXME */
+    FD_ZERO(&readfds);
+    FD_SET(udevfd, &readfds);
+    tv.tv_sec = 0;
+    tv.tv_usec = 1000;
+    ret = select(udevfd + 1, &readfds, NULL, NULL, &tv);
+    if (ret > 0 && FD_ISSET(udevfd, &readfds))
+      udev_event();
   }
 
   /* In the future, the while loop may break on critical error,

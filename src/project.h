@@ -63,6 +63,7 @@
 #include <stdarg.h>
 #include <getopt.h>
 #include <xenstore.h>
+#include <xcxenstore.h>
 #include <libudev.h>
 #include <usb.h>
 
@@ -90,6 +91,7 @@ typedef struct {
   int devid;
   char *shortname;
   char *longname;
+  char *sysname;
   vm_t *vm;
 } device_t;
 
@@ -97,11 +99,27 @@ xcdbus_conn_t *g_xcbus;
 vm_t vms;
 device_t devices;
 
-int usbowls_xenstore_init(void);
-int usbowls_xenstore_deinit(void);
-int usbowls_plug_device(int domid, int bus, int device);
-int usbowls_unplug_device(int domid, int bus, int device);
+int   usbowls_xenstore_init(void);
+int   usbowls_xenstore_deinit(void);
+int   usbowls_plug_device(int domid, int bus, int device);
+int   usbowls_unplug_device(int domid, int bus, int device);
 
-void rpc_init(void);
+void  rpc_init(void);
+
+int   udev_init(void);
+void  udev_event(void);
+int   udev_maybe_add_device(struct udev_device *dev);
+int   udev_fill_devices(void);
+int   udev_bind_device_to_dom0(struct udev_device *dev);
+
+int   device_add(int  busid, int  devid, char *shortname,
+		char *longname, char *sysname, int domid);
+int   device_del(int  busid, int  devid);
+int   device_bind_to_dom0(int busid, int devid);
+int   device_bind_to_dom0_by_sysname(const char *name);
+char* device_type(unsigned char class, unsigned char subclass,
+		  unsigned char protocol);
+
+vm_t* vm_lookup(int domid);
 
 #endif

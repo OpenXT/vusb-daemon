@@ -25,7 +25,7 @@ INCLUDES = @DBUS_CFLAGS@ @DBUS_GLIB_CFLAGS@ @LIBXCDBUS_INC@ @LIBV4V_INC@ @LIBUSB
 
 sbin_PROGRAMS = vusb-daemon
 
-PROTO_SRCS = main.c usbowls.c rpc.c
+PROTO_SRCS = main.c usbowls.c rpc.c udev.c device.c vm.c
 
 vusb_daemon_SOURCES = ${PROTO_SRCS} rpcgen/ctxusb_daemon_server_obj.c
 

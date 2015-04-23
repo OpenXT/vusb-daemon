@@ -492,8 +492,8 @@ resetDevice(int busNum, int devNum)
 
     if(dev != NULL)
     {
-        /* Device found */
-        handle = usb_open(dev);
+       /* Device found */
+       handle = usb_open(dev);
        if (handle != NULL)
        {
          usb_reset(handle);
@@ -559,12 +559,14 @@ usbowls_plug_device(int domid, int bus, int device)
     return 1;
   }
 
+  /* FIXME: unbind from dom0 */
+
   ret = xenstore_create_usb(&di, &ui);
   if (ret != 0) {
     xd_log(LOG_ERR, "Failed to attach device");
     return 1;
   }
-  /* TODO: wait for the backend to be connected (xs_watch) */
+  /* FIXME: wait for the backend to be connected (xs_watch) */
   ret = vusb_assign(ui.usb_vendor, ui.usb_product, 1);
   if (ret != 0) {
     xd_log(LOG_ERR, "Failed to assign device");
@@ -603,6 +605,8 @@ usbowls_unplug_device(int domid, int bus, int device)
     xd_log(LOG_ERR, "Failed to detach device");
     return 1;
   }
+
+ /* FIXME: Reset and bind to dom0 */
 
   return 0;
 }

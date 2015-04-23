@@ -77,6 +77,20 @@
 #define DOM0_UUID   "00000000-0000-0000-0000-000000000000"
 #define UIVM_UUID   "00000000-0000-0000-0000-000000000001"
 
+#define DEV_STATE_ERROR       -1 /* Cannot find device */
+#define DEV_STATE_UNUSED      0  /* Device not in use by any VM */
+#define DEV_STATE_ASSIGNED    1  /* Assigned to another VM which is off */
+#define DEV_STATE_IN_USE      2  /* Assigned to another VM which is running */
+#define DEV_STATE_BLOCKED     3  /* Blocked by policy for this VM */
+#define DEV_STATE_THIS        4  /* In use by this VM */
+#define DEV_STATE_THIS_ALWAYS 5  /* In use by this VM and flagged "always" */
+#define DEV_STATE_ALWAYS_ONLY 6  /* Flagged as "always" assigned to this VM, but not currently in use */
+#define DEV_STATE_PLATFORM    7  /* Special platform device, listed purely for information */
+#define DEV_STATE_HID_DOM0    8  /* HiD device assigned to dom0 */
+#define DEV_STATE_HID_ALWAYS  9  /* HiD device currently assigned to dom0, but always assigned to another VM */
+#define DEV_STATE_CD_DOM0     10 /* External CD drive assigned to dom0 */
+#define DEV_STATE_CD_ALWAYS   11 /* External CD drive currently assigned to dom0, but always assigned to another VM */
+
 #define xd_log(I, ...) { fprintf(stderr, ##__VA_ARGS__); fprintf(stderr, "\n"); }
 
 typedef struct {

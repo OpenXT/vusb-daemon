@@ -202,10 +202,13 @@ gboolean ctxusb_daemon_get_device_info(CtxusbDaemonObject *this,
   *OUT_name = g_strdup(device->shortname);
   *OUT_state = 0;
   if (device->vm != NULL) {
-    *OUT_state = 2;
+    if (!strncmp(device->vm->uuid, IN_vm_uuid, UUID_LENGTH))
+      *OUT_state = DEV_STATE_THIS;
+    else
+      *OUT_state = DEV_STATE_ASSIGNED;
     *OUT_vm_assigned = g_strdup(device->vm->uuid);
   } else {
-    *OUT_state = 0;
+    *OUT_state = DEV_STATE_UNUSED;
     *OUT_vm_assigned = g_strdup("");
   }
   *OUT_detail = g_strdup(device->longname);

@@ -18,6 +18,7 @@
 
 #include "project.h"
 
+#if 0
 static int
 disable_autoprobe(void)
 {
@@ -31,6 +32,7 @@ disable_autoprobe(void)
 
   return 0;
 }
+#endif
 
 int
 main() {
@@ -67,11 +69,12 @@ main() {
   /* Setup the dbus server */
   rpc_init();
 
+  /* Why would we do that? */
   /* Disable driver autoprobing */
-  if (disable_autoprobe() != 0) {
-    xd_log(LOG_ERR, "Unable to disable autoprobing");
-    return -1;
-  }
+  /* if (disable_autoprobe() != 0) { */
+  /*   xd_log(LOG_ERR, "Unable to disable autoprobing"); */
+  /*   return -1; */
+  /* } */
 
   /* Setup the udev monitor */
   udevfd = udev_init();
@@ -79,6 +82,12 @@ main() {
     xd_log(LOG_ERR, "Unable to initialize the udev monitor");
     return -1;
   }
+
+  /* Setup libusb */
+  /* if (libusb_init(NULL) != 0) { */
+  /*   xd_log(LOG_ERR, "Unable to initialize libusb"); */
+  /*   return -1; */
+  /* } */
 
   /* Main loop */
   while (1) {
@@ -105,6 +114,8 @@ main() {
   /* In the future, the while loop may break on critical error,
      so cleaning up here may be a good idea */
   ret = usbowls_xenstore_deinit();
+
+  /* libusb_exit(NULL); */
 
   /* FIXME: free VMs and devices lists */
 

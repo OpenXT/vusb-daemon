@@ -29,6 +29,7 @@ PROTO_SRCS = main.c usbowls.c rpc.c udev.c device.c vm.c
 
 vusb_daemon_SOURCES = ${PROTO_SRCS} rpcgen/ctxusb_daemon_server_obj.c
 
+# Add -lusb-1.0 for a decent usb lib
 vusb_daemon_LDADD = @LIBXCXENSTORE_LIBS@ @LIBEXPAT_LIB@ @DBUS_LIBS@ @DBUS_GLIB_LIBS@ @LIBXCDBUS_LIBS@ @UDEV_LIBS@ -lusb -levent
 
 BUILT_SOURCES = \

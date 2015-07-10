@@ -257,7 +257,7 @@ void
 udev_event(void)
 {
   struct udev_device *dev;
-  char *action;
+  const char *action;
 
   dev = udev_monitor_receive_device(udev_mon);
   if (dev) {

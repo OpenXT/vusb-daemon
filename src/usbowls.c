@@ -309,6 +309,7 @@ xenstore_destroy_usb(dominfo_t *domp, usbinfo_t *usbp)
   snprintf(value, sizeof (value), "%d", XB_CLOSING);
   xs_set_keyval(XBT_NULL, bepath, "state", value);
 
+  /* TODO: NUKE SLEEPS!! */
   for (i = 0; i < 30; ++i) {
     usleep(100000);
     if (test_offline(domp, usbp)) {
@@ -453,61 +454,6 @@ list_domain_devs(dominfo_t *domp)
   fflush(stdout);
 }
 
-/* Find the libusb node representing the device with the given bus and device numbers
- * param    busNum               number of bus target device is on
- * param    devNum               number of targe device within bus
- * return                        libusb node representing specified device, NULL for none
- */
-static struct usb_device*
-findLibusbDev(int busNum, int devNum)
-{
-    struct usb_bus *bus;
-    struct usb_device *dev;
-
-    usb_find_busses();
-    usb_find_devices();
-
-    for(bus = usb_get_busses(); bus != NULL; bus = bus->next)
-        for(dev = bus->devices; dev != NULL; dev = dev->next)
-            if(atoi(bus->dirname) == busNum && atoi(dev->filename) == devNum)  // Match
-                return dev;
-
-    /* Device not found */
-    return NULL;
-}
-
-/* Reset the specified device
- * param    busNum               number of bus target device is on
- * param    devNum               number of targe device within bus
- */
-static void
-resetDevice(int busNum, int devNum)
-{
-    struct usb_device *dev;  /* libusb device */
-    usb_dev_handle *handle;  /* handle to libusb device */
-
-    /* TODO: unbind? */
-
-    dev = findLibusbDev(busNum, devNum);
-
-    if(dev != NULL)
-    {
-       /* Device found */
-       handle = usb_open(dev);
-       if (handle != NULL)
-       {
-         usb_reset(handle);
-         usb_close(handle);
-       } else {
-         xd_log(LOG_ERR, "usb_open failed for %d-%d", busNum, devNum);
-       }
-    } else {
-      xd_log(LOG_ERR, "Failed to find device %d-%d for reset", busNum, devNum);
-    }
-
-    /* TODO: bind? */
-}
-
 int
 usbowls_xenstore_init(void)
 {
@@ -559,17 +505,22 @@ usbowls_plug_device(int domid, int bus, int device)
     return 1;
   }
 
-  /* FIXME: unbind from dom0 */
+  /* FIXME: nicely unbind dom0 drivers on interfaces?
+   * USB supports hot unplug doesn't it? :)
+   */
 
   ret = xenstore_create_usb(&di, &ui);
   if (ret != 0) {
     xd_log(LOG_ERR, "Failed to attach device");
     return 1;
   }
+
   /* FIXME: wait for the backend to be connected (xs_watch) */
+
   ret = vusb_assign(ui.usb_vendor, ui.usb_product, 1);
   if (ret != 0) {
     xd_log(LOG_ERR, "Failed to assign device");
+    xenstore_destroy_usb(&di, &ui);
     return 1;
   }
 
@@ -605,8 +556,6 @@ usbowls_unplug_device(int domid, int bus, int device)
     xd_log(LOG_ERR, "Failed to detach device");
     return 1;
   }
-
- /* FIXME: Reset and bind to dom0 */
 
   return 0;
 }

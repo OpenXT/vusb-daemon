@@ -98,6 +98,8 @@ vm_del(const int domid)
   }
   if (vm->domid == domid) {
     list_del(pos);
+    free(vm->uuid);
+    free(vm);
   } else {
     xd_log(LOG_ERR, "VM not found: %d", domid);
     return -1;

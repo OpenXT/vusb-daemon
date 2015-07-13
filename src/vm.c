@@ -97,6 +97,7 @@ vm_del(const int domid)
     }
   }
   if (vm->domid == domid) {
+    xd_log(LOG_INFO, "Deleting vm, domid=%d, uuid=%s", vm->domid, vm->uuid);
     list_del(pos);
     free(vm->uuid);
     free(vm);

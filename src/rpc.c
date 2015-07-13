@@ -91,7 +91,12 @@ gboolean ctxusb_daemon_set_policy_domuuid(
     const char *uuid,
     const char *policy, GError **error)
 {
-    return FALSE;
+  g_set_error(error,
+	      DBUS_GERROR,
+	      DBUS_GERROR_FAILED,
+	      "set_policy_domuuid hasn't been implemented yet");
+
+  return FALSE;
 }
 
 gboolean ctxusb_daemon_get_policy_domuuid(
@@ -99,7 +104,12 @@ gboolean ctxusb_daemon_get_policy_domuuid(
     const char *uuid,
     char **value, GError **error)
 {
-    return FALSE;
+  g_set_error(error,
+	      DBUS_GERROR,
+	      DBUS_GERROR_FAILED,
+	      "get_policy_domuuid hasn't been implemented yet");
+
+  return FALSE;
 }
 
 gboolean ctxusb_daemon_new_vm(CtxusbDaemonObject *this,
@@ -109,7 +119,15 @@ gboolean ctxusb_daemon_new_vm(CtxusbDaemonObject *this,
 
   ret = add_vm(IN_dom_id);
 
-  return ret ? FALSE : TRUE;
+  if (ret) {
+    g_set_error(error,
+		DBUS_GERROR,
+		DBUS_GERROR_FAILED,
+		"Failed to add VM %d", IN_dom_id);
+    return FALSE;
+  } else {
+    return TRUE;
+  }
 }
 
 gboolean ctxusb_daemon_vm_stopped(CtxusbDaemonObject *this,
@@ -119,7 +137,15 @@ gboolean ctxusb_daemon_vm_stopped(CtxusbDaemonObject *this,
 
   ret = vm_del(IN_dom_id);
 
-  return ret ? FALSE : TRUE;
+  if (ret) {
+    g_set_error(error,
+		DBUS_GERROR,
+		DBUS_GERROR_FAILED,
+		"Failed to delete VM %d", IN_dom_id);
+    return FALSE;
+  } else {
+    return TRUE;
+  }
 }
 
 gboolean ctxusb_daemon_list_devices(CtxusbDaemonObject *this,
@@ -151,8 +177,6 @@ gboolean ctxusb_daemon_get_device_info(CtxusbDaemonObject *this,
   device_t *device;
   int busid, devid;
 
-  printf("ctxusb_daemon_get_device_info %d %s\n", IN_dev_id, IN_vm_uuid);
-
   makeBusDevPair(IN_dev_id, &busid, &devid);
   list_for_each(pos, &devices.list) {
     device = list_entry(pos, device_t, list);
@@ -161,7 +185,10 @@ gboolean ctxusb_daemon_get_device_info(CtxusbDaemonObject *this,
     }
   }
   if (device->busid != busid || device->devid != devid) {
-    xd_log(LOG_ERR, "Device not found: %d", IN_dev_id);
+    g_set_error(error,
+		DBUS_GERROR,
+		DBUS_GERROR_FAILED,
+		"Device not found: %d", IN_dev_id);
     return FALSE;
   }
   *OUT_name = g_strdup(device->shortname);
@@ -205,23 +232,37 @@ gboolean ctxusb_daemon_assign_device(CtxusbDaemonObject *this,
   }
 
   if (device->busid != busid || device->devid != devid) {
-    xd_log(LOG_ERR, "Device not found: %d", IN_dev_id);
+    g_set_error(error,
+		DBUS_GERROR,
+		DBUS_GERROR_FAILED,
+		"Device not found: %d", IN_dev_id);
     return FALSE;
   }
   if (strncmp(vm->uuid, IN_vm_uuid, UUID_LENGTH)) {
-    xd_log(LOG_ERR, "VM not found: %s", IN_vm_uuid);
+    g_set_error(error,
+		DBUS_GERROR,
+		DBUS_GERROR_FAILED,
+		"VM not found: %s", IN_vm_uuid);
     return FALSE;
   }
   if (vm->domid < 0) {
-    xd_log(LOG_ERR, "Can't assign the device to a stopped VM");
+    g_set_error(error,
+		DBUS_GERROR,
+		DBUS_GERROR_FAILED,
+		"Can't assign device %d to stopped VM %s", IN_dev_id, IN_vm_uuid);
     return FALSE;
   }
 
   device->vm = vm;
 
   ret = usbowls_plug_device(vm->domid, device->busid, device->devid);
-  if (ret != 0)
+  if (ret != 0) {
+    g_set_error(error,
+		DBUS_GERROR,
+		DBUS_GERROR_FAILED,
+		"Failed to plug device %d-%d to VM %d", device->busid, device->devid, vm->domid);
     return FALSE;
+  }
 
   return TRUE;
 }
@@ -242,15 +283,28 @@ gboolean ctxusb_daemon_unassign_device(CtxusbDaemonObject *this,
     }
   }
   if (device->busid != busid || device->devid != devid) {
-    xd_log(LOG_ERR, "Device not found: %d", IN_dev_id);
+    g_set_error(error,
+		DBUS_GERROR,
+		DBUS_GERROR_FAILED,
+		"Device not found: %d", IN_dev_id);
     return FALSE;
   }
 
-  if (device->vm == NULL)
+  if (device->vm == NULL) {
+    g_set_error(error,
+		DBUS_GERROR,
+		DBUS_GERROR_FAILED,
+		"Device %d is not currently assigned to a VM, can't unassign", IN_dev_id);
     return FALSE;
+  }
   ret = usbowls_unplug_device(device->vm->domid, device->busid, device->devid);
-  if (ret != 0)
+  if (ret != 0) {
+    g_set_error(error,
+		DBUS_GERROR,
+		DBUS_GERROR_FAILED,
+		"Failed to unplug device %d-%d from VM %d", device->busid, device->devid, device->vm->domid);
     return FALSE;
+  }
 
   device->vm = NULL;
 

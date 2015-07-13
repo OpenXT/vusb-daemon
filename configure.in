@@ -59,7 +59,8 @@ PKG_CHECK_MODULES([DBUS],[dbus-1])
 PKG_CHECK_MODULES([DBUS_GLIB],[dbus-glib-1])
 PKG_CHECK_MODULES([LIBV4V],[libv4v])
 PKG_CHECK_MODULES([UDEV],[libudev])
-PKG_CHECK_MODULES([LIBXCXENSTORE],[libxcxenstore])
+# Uncomment this for libxcxenstore
+# PKG_CHECK_MODULES([LIBXCXENSTORE],[libxcxenstore])
 
 LIBV4V_CONFIG=no
 AC_ARG_WITH(libv4v,

@@ -19,7 +19,7 @@
 #include "project.h"
 
 vm_t*
-vm_lookup(int domid)
+vm_lookup(const int domid)
 {
   struct list_head *pos;
   vm_t *vm;
@@ -35,4 +35,73 @@ vm_lookup(int domid)
     return vm;
 
   return NULL;
+}
+
+static char*
+uuid_copy_and_sanitize(const char *uuid)
+{
+  char *res = malloc(UUID_LENGTH);
+  int i;
+
+  for (i = 0; i < UUID_LENGTH - 1; ++i)
+    res[i] = (uuid[i] == '_') ? '-' : uuid[i];
+
+  res[UUID_LENGTH - 1] = '\0';
+
+  return res;
+}
+
+int
+vm_add(const int domid, const char *uuid)
+{
+  struct list_head *pos;
+  vm_t *vm;
+  char *new_uuid;
+
+  /* The UUID may have "_"s instead of "-"s, like in the xenmgr dbus reply.
+     Fix this while duplicating the UUID. */
+  new_uuid = uuid_copy_and_sanitize(uuid);
+
+  list_for_each(pos, &vms.list) {
+    vm = list_entry(pos, vm_t, list);
+    if (vm->domid == domid) {
+      xd_log(LOG_ERR, "new VM already registered: %d", domid);
+      return -1;
+    }
+    if (!strcmp(vm->uuid, new_uuid)) {
+      xd_log(LOG_WARN, "VM already registered: %s. Changing domid", new_uuid);
+      vm->domid = domid;
+      return 0;
+    }
+  }
+
+  xd_log(LOG_INFO, "Adding vm, domid=%d, uuid=%s", domid, new_uuid);
+  vm = malloc(sizeof(vm_t));
+  vm->domid = domid;
+  vm->uuid = new_uuid;
+  list_add(&vm->list, &vms.list);
+
+  return 0;
+}
+
+int
+vm_del(const int domid)
+{
+  struct list_head *pos;
+  vm_t *vm;
+
+  list_for_each(pos, &vms.list) {
+    vm = list_entry(pos, vm_t, list);
+    if (vm->domid == domid) {
+      break;
+    }
+  }
+  if (vm->domid == domid) {
+    list_del(pos);
+  } else {
+    xd_log(LOG_ERR, "VM not found: %d", domid);
+    return -1;
+  }
+
+  return 0;
 }

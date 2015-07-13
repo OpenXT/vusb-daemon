@@ -63,7 +63,7 @@
 #include <stdarg.h>
 #include <getopt.h>
 #include <xenstore.h>
-#include <xcxenstore.h>
+/* #include <xcxenstore.h> */
 #include <libudev.h>
 #include <usb.h>
 /* #include <libusb-1.0/libusb.h> */
@@ -73,10 +73,13 @@
 #include "list.h"
 #include "classes.h"
 
-#define UUID_LENGTH 37
+#define UUID_LENGTH 37 /* Includes the string terminator */
 #define DOM0_DOMID  0
 #define DOM0_UUID   "00000000-0000-0000-0000-000000000000"
 #define UIVM_UUID   "00000000-0000-0000-0000-000000000001"
+
+#define XENMGR      "com.citrix.xenclient.xenmgr"
+#define XENMGR_OBJ  "/"
 
 #define DEV_STATE_ERROR       -1 /* Cannot find device */
 #define DEV_STATE_UNUSED      0  /* Device not in use by any VM */
@@ -110,6 +113,31 @@ typedef struct {
   vm_t *vm;
 } device_t;
 
+typedef struct dominfo
+{
+  int di_domid;
+  char *di_name;
+  char *di_dompath;
+} dominfo_t;
+
+typedef struct usbinfo
+{
+  int usb_virtid;
+  int usb_bus;	/* USB bus in the physical machine */
+  int usb_device;	/* USB device in the physical machine */
+  int usb_vendor;
+  int usb_product;
+} usbinfo_t;
+
+enum XenBusStates {
+  XB_UNKNOWN, XB_INITTING, XB_INITWAIT, XB_INITTED, XB_CONNECTED,
+  XB_CLOSING, XB_CLOSED
+};
+
+/* char *xasprintf(const char *fmt, ...) __attribute__ ((format (printf, 1, 2))); */
+struct xs_handle *xs_handle;
+char *xs_dom0path;
+
 xcdbus_conn_t *g_xcbus;
 vm_t vms;
 device_t devices;
@@ -135,6 +163,17 @@ int   device_bind_to_dom0_by_sysname(const char *name);
 char* device_type(unsigned char class, unsigned char subclass,
 		  unsigned char protocol);
 
-vm_t* vm_lookup(int domid);
+vm_t* vm_lookup(const int domid);
+int   vm_add(const int domid, const char *uuid);
+int   vm_del(const int domid);
+
+int   xenstore_create_usb(dominfo_t *domp, usbinfo_t *usbp);
+int   xenstore_destroy_usb(dominfo_t *domp, usbinfo_t *usbp);
+char* xenstore_dom_read (unsigned int domid, const char *format, ...);
+int   xenstore_get_dominfo(int domid, dominfo_t *di);
+void  xenstore_get_xb_states(dominfo_t *domp, usbinfo_t *usbp, int *frontst, int *backst);
+void  xenstore_list_domain_devs(dominfo_t *domp);
+int   xenstore_init(void);
+int   xenstore_deinit(void);
 
 #endif

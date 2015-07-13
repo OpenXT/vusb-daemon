@@ -60,63 +60,28 @@ void rpc_init(void)
  * param    dev_num              device number within bus
  * return                        device id
  */
-int makeDeviceId(int bus_num, int dev_num)
+static int makeDeviceId(int bus_num, int dev_num)
 {
   return ((bus_num - 1) << 7) + (dev_num - 1);
 }
 
-void makeBusDevPair(int devid, int *bus_num, int *dev_num)
+static void makeBusDevPair(int devid, int *bus_num, int *dev_num)
 {
   *bus_num = (devid >> 7) + 1;
   *dev_num = (devid & 0x7F) + 1;
 }
 
-int add_vm(int domid)
+static int add_vm(int domid)
 {
   char *uuid;
-  struct list_head *pos;
-  vm_t *vm;
 
-  list_for_each(pos, &vms.list) {
-    vm = list_entry(pos, vm_t, list);
-    if (vm->domid == domid) {
-          xd_log(LOG_ERR, "new VM already registered: %d", domid);
-	  return 0;
-    }
-  }
-  vm = malloc(sizeof(vm_t));
-  vm->domid = domid;
   uuid = xenstore_dom_read(domid, "vm");
   if (uuid == NULL) {
     xd_log(LOG_ERR, "Couldn't find UUID for domid %d", domid);
     return -1;
   }
-  vm->uuid = malloc(UUID_LENGTH);
-  strncpy(vm->uuid, uuid + 4, UUID_LENGTH);
+  vm_add(domid, uuid + 4);
   free(uuid);
-  list_add(&vm->list, &vms.list);
-
-  return 0;
-}
-
-int del_vm(int domid)
-{
-  char *uuid;
-  struct list_head *pos;
-  vm_t *vm;
-
-  list_for_each(pos, &vms.list) {
-    vm = list_entry(pos, vm_t, list);
-    if (vm->domid == domid) {
-      break;
-    }
-  }
-  if (vm->domid == domid) {
-    list_del(pos);
-  } else {
-    xd_log(LOG_ERR, "VM not found: %d", domid);
-    return -1;
-  }
 
   return 0;
 }
@@ -152,7 +117,7 @@ gboolean ctxusb_daemon_vm_stopped(CtxusbDaemonObject *this,
 {
   int ret;
 
-  ret = del_vm(IN_dom_id);
+  ret = vm_del(IN_dom_id);
 
   return ret ? FALSE : TRUE;
 }
@@ -245,6 +210,10 @@ gboolean ctxusb_daemon_assign_device(CtxusbDaemonObject *this,
   }
   if (strncmp(vm->uuid, IN_vm_uuid, UUID_LENGTH)) {
     xd_log(LOG_ERR, "VM not found: %s", IN_vm_uuid);
+    return FALSE;
+  }
+  if (vm->domid < 0) {
+    xd_log(LOG_ERR, "Can't assign the device to a stopped VM");
     return FALSE;
   }
 

@@ -34,10 +34,43 @@ disable_autoprobe(void)
 }
 #endif
 
+static void fill_vms()
+{
+  GPtrArray *paths;
+  int i;
+  vm_t *vm;
+
+  /* Add dom0 to the list of VMs */
+  vm_add(DOM0_DOMID, DOM0_UUID);
+
+  /* Get all the (other) VMs from xenmgr */
+  /* If xenmgr is not started yet, this will fail,
+     which is fine since we'll get new VM notifications once xenmgr is up and runnning */
+  com_citrix_xenclient_xenmgr_list_vms_(g_xcbus, XENMGR, XENMGR_OBJ, &paths);
+  if (!com_citrix_xenclient_xenmgr_list_vms_(g_xcbus, XENMGR, XENMGR_OBJ, &paths)) {
+    xd_log(LOG_WARN, "Unable to get the list of VMs");
+    return;
+  }
+
+  /* Get their domid and add them to the list */
+  for (i = 0; i < paths->len; ++i) {
+    const char *path = g_ptr_array_index(paths, i);
+    int domid;
+
+    if (!property_get_com_citrix_xenclient_xenmgr_vm_domid_(g_xcbus, XENMGR, path, &domid)) {
+      xd_log(LOG_ERR, "Unable to get the domid of a VM");
+      return;
+    }
+
+    vm_add(domid, path + 4);
+  }
+
+  g_ptr_array_free(paths, TRUE);
+}
+
 int
 main() {
   int ret;
-  vm_t *vm;
   struct timeval tv;
   fd_set readfds;
   fd_set writefds;
@@ -45,29 +78,25 @@ main() {
   int nfds;
   int udevfd;
 
+  /* Setup dbus */
+  rpc_init();
+
   /* Init global VMs and devices lists */
   INIT_LIST_HEAD(&vms.list);
   INIT_LIST_HEAD(&devices.list);
 
-  /* Add dom0 to the list of VMs */
-  vm = malloc(sizeof(vm_t));
-  vm->domid = DOM0_DOMID;
-  vm->uuid = DOM0_UUID;
-  list_add(&vm->list, &vms.list);
+  /* Populate the VM list */
+  fill_vms();
 
-  /* Add the USB devices to the global device list */
+  /* Populate the USB device list */
   udev_fill_devices();
 
   /* Initialize xenstore handle in usbowls */
-  ret = usbowls_xenstore_init();
+  xs_handle = NULL;
+  xs_dom0path = NULL;
+  ret = xenstore_init();
   if (ret != 0)
     return ret;
-
-  /* FIXME: merge with the previous xenstore init */
-  xenstore_init();
-
-  /* Setup the dbus server */
-  rpc_init();
 
   /* Why would we do that? */
   /* Disable driver autoprobing */
@@ -113,7 +142,7 @@ main() {
 
   /* In the future, the while loop may break on critical error,
      so cleaning up here may be a good idea */
-  ret = usbowls_xenstore_deinit();
+  ret = xenstore_deinit();
 
   /* libusb_exit(NULL); */
 

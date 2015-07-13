@@ -21,16 +21,18 @@ DBUS_SERVER_IDLS = ctxusb_daemon
 
 AM_CFLAGS = -finput-charset=UTF-8 -std=gnu99 -DROOT_UID=0 -DHAVE_ARCH_STRUCT_FLOCK -DUSE_DBUS -DHAVE_ARCH_STRUCT_FLOCK
 
-INCLUDES = @DBUS_CFLAGS@ @DBUS_GLIB_CFLAGS@ @LIBXCDBUS_INC@ @LIBV4V_INC@ @LIBUSB_CFLAGS@ @LIBXCXENSTORE_CFLAGS@ @LIBEXPAT_INC@ @UDEV_CFLAGS@
+# Add @LIBXCXENSTORE_CFLAGS@ for libxcxenstore
+INCLUDES = @DBUS_CFLAGS@ @DBUS_GLIB_CFLAGS@ @LIBXCDBUS_INC@ @LIBV4V_INC@ @LIBUSB_CFLAGS@ @LIBEXPAT_INC@ @UDEV_CFLAGS@
 
 sbin_PROGRAMS = vusb-daemon
 
-PROTO_SRCS = main.c usbowls.c rpc.c udev.c device.c vm.c
+PROTO_SRCS = main.c usbowls.c rpc.c udev.c device.c vm.c xenstore.c
 
 vusb_daemon_SOURCES = ${PROTO_SRCS} rpcgen/ctxusb_daemon_server_obj.c
 
 # Add -lusb-1.0 for a decent usb lib
-vusb_daemon_LDADD = @LIBXCXENSTORE_LIBS@ @LIBEXPAT_LIB@ @DBUS_LIBS@ @DBUS_GLIB_LIBS@ @LIBXCDBUS_LIBS@ @UDEV_LIBS@ -lusb -levent
+# Add @LIBXCXENSTORE_LIBS@ for libxcxenstore
+vusb_daemon_LDADD = @LIBEXPAT_LIB@ @DBUS_LIBS@ @DBUS_GLIB_LIBS@ @LIBXCDBUS_LIBS@ @UDEV_LIBS@ -lusb -levent -lxenstore
 
 BUILT_SOURCES = \
         ${DBUS_CLIENT_IDLS:%=rpcgen/%_client.h} \

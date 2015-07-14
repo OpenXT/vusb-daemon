@@ -37,6 +37,25 @@ vm_lookup(const int domid)
   return NULL;
 }
 
+vm_t*
+vm_lookup_by_uuid(const char *uuid)
+{
+  struct list_head *pos;
+  vm_t *vm;
+
+  list_for_each(pos, &vms.list) {
+    vm = list_entry(pos, vm_t, list);
+    if (!strcmp(vm->uuid, uuid)) {
+      break;
+    }
+  }
+
+  if (!strcmp(vm->uuid, uuid))
+    return vm;
+
+  return NULL;
+}
+
 static char*
 uuid_copy_and_sanitize(const char *uuid)
 {

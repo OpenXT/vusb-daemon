@@ -164,6 +164,7 @@ char* device_type(unsigned char class, unsigned char subclass,
 		  unsigned char protocol);
 
 vm_t* vm_lookup(const int domid);
+vm_t* vm_lookup_by_uuid(const char *uuid);
 int   vm_add(const int domid, const char *uuid);
 int   vm_del(const int domid);
 

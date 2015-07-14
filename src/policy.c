@@ -112,7 +112,7 @@ policy_read_always_from_file(void)
       uuid = malloc(size + 1);
       strncpy(uuid, begin, size);
       uuid[size] = '\0';
-      if (end == NULL || *end != '"' || *(end + 1) != '\0')
+      if (end == NULL || *end != '"')
 	break;
 
       /* All set. Create the rule item and set ret to success (0) */

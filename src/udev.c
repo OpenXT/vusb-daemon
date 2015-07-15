@@ -55,7 +55,7 @@ check_sysname(const char *s)
   return 0;
 }
 
-int
+static int
 udev_maybe_add_device(struct udev_device *dev, int auto_assign)
 {
   const char *value;

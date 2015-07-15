@@ -170,7 +170,6 @@ void  rpc_init(void);
 
 int   udev_init(void);
 void  udev_event(void);
-int   udev_maybe_add_device(struct udev_device *dev);
 int   udev_fill_devices(void);
 int   udev_bind_device_to_dom0(struct udev_device *dev);
 

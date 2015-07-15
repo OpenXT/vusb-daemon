@@ -74,7 +74,6 @@ sticky_add(int vendorid,
   sticky->uuid = malloc(strlen(uuid));
   strcpy(sticky->uuid, uuid);
   list_add(&sticky->list, &stickys.list);
-  policy_dump_stickys_to_file();
 }
 
 static sticky_t*
@@ -200,6 +199,7 @@ policy_set_sticky(int dev)
   if (device == NULL || device->vm == NULL)
     return -1;
   sticky_add(device->vendorid, device->deviceid, device->shortname, device->vm->uuid);
+  policy_dump_stickys_to_file();
 }
 
 int

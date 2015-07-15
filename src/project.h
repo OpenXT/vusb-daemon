@@ -77,6 +77,7 @@
 #define DOM0_DOMID  0
 #define DOM0_UUID   "00000000-0000-0000-0000-000000000000"
 #define UIVM_UUID   "00000000-0000-0000-0000-000000000001"
+#define UIVM_PATH   "/vm/00000000_0000_0000_0000_000000000001"
 
 #define XENMGR      "com.citrix.xenclient.xenmgr"
 #define XENMGR_OBJ  "/"
@@ -107,6 +108,8 @@ typedef struct {
   struct list_head list;
   int busid;
   int devid;
+  int vendorid;
+  int deviceid;
   char *shortname;
   char *longname;
   char *sysname;
@@ -134,6 +137,22 @@ enum XenBusStates {
   XB_CLOSING, XB_CLOSED
 };
 
+/* Generate a device ID
+ * param    bus_num              number of bus device is on
+ * param    dev_num              device number within bus
+ * return                        device id
+ */
+static int makeDeviceId(int bus_num, int dev_num)
+{
+  return ((bus_num - 1) << 7) + (dev_num - 1);
+}
+
+static void makeBusDevPair(int devid, int *bus_num, int *dev_num)
+{
+  *bus_num = (devid >> 7) + 1;
+  *dev_num = (devid & 0x7F) + 1;
+}
+
 /* char *xasprintf(const char *fmt, ...) __attribute__ ((format (printf, 1, 2))); */
 struct xs_handle *xs_handle;
 char *xs_dom0path;
@@ -155,12 +174,13 @@ int   udev_maybe_add_device(struct udev_device *dev);
 int   udev_fill_devices(void);
 int   udev_bind_device_to_dom0(struct udev_device *dev);
 
-int   device_add(int  busid, int  devid, char *shortname,
-		char *longname, char *sysname, int domid);
-int   device_del(int  busid, int  devid);
-int   device_bind_to_dom0(int busid, int devid);
-int   device_bind_to_dom0_by_sysname(const char *name);
-char* device_type(unsigned char class, unsigned char subclass,
+device_t*   device_lookup(int busid, int devid);
+device_t*   device_add(int busid, int devid, int vendorid, int deviceid,
+		       char *shortname, char *longname, char *sysname);
+int         device_del(int  busid, int  devid);
+int         device_bind_to_dom0(int busid, int devid);
+int         device_bind_to_dom0_by_sysname(const char *name);
+char*       device_type(unsigned char class, unsigned char subclass,
 		  unsigned char protocol);
 
 vm_t* vm_lookup(const int domid);
@@ -176,5 +196,10 @@ void  xenstore_get_xb_states(dominfo_t *domp, usbinfo_t *usbp, int *frontst, int
 void  xenstore_list_domain_devs(dominfo_t *domp);
 int   xenstore_init(void);
 int   xenstore_deinit(void);
+
+void  policy_init(void);
+int   policy_auto_assign(device_t *device);
+int   policy_set_sticky(int dev);
+int   policy_unset_sticky(int dev);
 
 #endif

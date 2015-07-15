@@ -18,7 +18,7 @@
 
 #include "project.h"
 
-#define ALWAYS_FILE_PATH "/config/etc/USB_always.conf"
+#define STICKY_FILE_PATH "/config/etc/USB_always.conf"
 
 typedef struct {
   struct list_head list;
@@ -26,45 +26,107 @@ typedef struct {
   int deviceid;
   char *serial;
   char *uuid;
-} always_t;
+} sticky_t;
 
-static bool auto_assign_to_focused_vm = false;
+static bool auto_assign_to_focused_vm = true;
 
-always_t alwayss;
+sticky_t stickys;
 
-/* Caller is responsible for allocating the strings. always_del() will free them */
-static void
-always_add(int vendorid,
-	   int deviceid,
-	   char *serial,
-	   char *uuid)
+static int
+policy_dump_stickys_to_file(void)
 {
-  always_t *always;
+  FILE *file;
+  char line[1024];
+  int ret;
+  struct list_head *pos;
 
-  always = malloc(sizeof(always_t));
-  always->vendorid = vendorid;
-  always->deviceid = deviceid;
-  /* always->serial = malloc(strlen(serial)); */
-  /* strcpy(always->serial, serial); */
-  /* always->uuid = malloc(strlen(uuid)); */
-  /* strcpy(always->uuid, uuid); */
-  always->serial = serial;
-  always->uuid = uuid;
-  list_add(&always->list, &alwayss.list);
+  file = fopen(STICKY_FILE_PATH, "w");
+  if (file == NULL)
+    {
+      xd_log(LOG_WARN, "No USB sticky loaded as the file couldn't be opened");
+      return -1;
+    }
+  list_for_each(pos, &stickys.list)
+    {
+      sticky_t *sticky;
+
+      sticky = list_entry(pos, sticky_t, list);
+      snprintf(line, 1024, "%X:%X:\"%s\"=\"%s\"\n",
+	       sticky->vendorid, sticky->deviceid, sticky->serial, sticky->uuid);
+      fputs(line, file);
+    }
+  fclose(file);
+}
+
+static void
+sticky_add(int vendorid,
+	   int deviceid,
+	   const char *serial,
+	   const char *uuid)
+{
+  sticky_t *sticky;
+
+  sticky = malloc(sizeof(sticky_t));
+  sticky->vendorid = vendorid;
+  sticky->deviceid = deviceid;
+  sticky->serial = malloc(strlen(serial));
+  strcpy(sticky->serial, serial);
+  sticky->uuid = malloc(strlen(uuid));
+  strcpy(sticky->uuid, uuid);
+  list_add(&sticky->list, &stickys.list);
+  policy_dump_stickys_to_file();
+}
+
+static sticky_t*
+sticky_lookup(int vendorid,
+	      int deviceid,
+	      const char *serial)
+{
+  struct list_head *pos;
+  sticky_t *sticky;
+
+  list_for_each(pos, &stickys.list) {
+    sticky = list_entry(pos, sticky_t, list);
+    if (sticky->vendorid == vendorid &&
+	sticky->deviceid == deviceid &&
+	!strcmp(sticky->serial, serial)) {
+      return sticky;
+    }
+  }
+
+  return NULL;
 }
 
 static int
-policy_read_always_from_file(void)
+sticky_del(int vendorid,
+	   int deviceid,
+	   const char *serial)
+{
+  sticky_t *sticky;
+
+  sticky = sticky_lookup(vendorid, deviceid, serial);
+  if (sticky == NULL)
+    return -1;
+  list_del(&sticky->list);
+  free(sticky->serial);
+  free(sticky->uuid);
+  free(sticky);
+
+  return 0;
+}
+
+static int
+policy_read_stickys_from_file(void)
 {
   FILE *file;
   char line[1024];
   int ret;
 
-  file = fopen(ALWAYS_FILE_PATH, "r");
+  file = fopen(STICKY_FILE_PATH, "r");
   if (file == NULL)
     {
-      xd_log(LOG_WARN, "No USB always loaded as the file couldn't be opened");
-      return 1;
+      xd_log(LOG_WARN, "No USB sticky loaded as the file couldn't be opened");
+      return -1;
     }
   while (fgets(line, 1024, file) != NULL)
     {
@@ -75,7 +137,7 @@ policy_read_always_from_file(void)
       char *serial, *uuid;
 
       /* Default to failure if we break */
-      ret = 2;
+      ret = -2;
 
       /* Read the vendorid and make sure it's followed by ':' */
       vendorid = strtol(begin, &end, 16);
@@ -116,92 +178,85 @@ policy_read_always_from_file(void)
 	break;
 
       /* All set. Create the rule item and set ret to success (0) */
-      always_add(vendorid, deviceid, serial, uuid);
+      sticky_add(vendorid, deviceid, serial, uuid);
       ret = 0;
     }
 
-  if (ret == 2)
-    xd_log(LOG_ERR, "Error while reading the USB always file");
+  if (ret == -2)
+    xd_log(LOG_ERR, "Error while reading the USB sticky file");
   fclose(file);
 
   return ret;
 }
 
-static int
-policy_dump_always_to_file(void)
+int
+policy_set_sticky(int dev)
 {
-  FILE *file;
-  char line[1024];
-  int ret;
-  struct list_head *pos;
+  int busid, devid;
+  device_t *device;
 
-  file = fopen(ALWAYS_FILE_PATH, "w");
-  if (file == NULL)
-    {
-      xd_log(LOG_WARN, "No USB always loaded as the file couldn't be opened");
-      return 1;
-    }
-  list_for_each(pos, &alwayss.list)
-    {
-      always_t *always;
-
-      always = list_entry(pos, always_t, list);
-      snprintf(line, 1024, "%X:%X:\"%s\"=\"%s\"\n",
-	       always->vendorid, always->deviceid, always->serial, always->uuid);
-      fputs(line, file);
-    }
-  fclose(file);
+  makeBusDevPair(dev, &busid, &devid);
+  device = device_lookup(busid, devid);
+  if (device == NULL || device->vm == NULL)
+    return -1;
+  sticky_add(device->vendorid, device->deviceid, device->shortname, device->vm->uuid);
 }
 
-void
-policy_add_always(int vendorid,
-		  int deviceid,
-		  const char *serial,
-		  const char *uuid)
+int
+policy_unset_sticky(int dev)
 {
-  char *new_serial, *new_uuid;
+  int busid, devid;
+  device_t *device;
 
-  new_serial = malloc(strlen(serial));
-  strcpy(new_serial, serial);
-  new_uuid = malloc(strlen(uuid));
-  strcpy(new_uuid, uuid);
-  always_add(vendorid, deviceid, new_serial, new_uuid);
-  policy_dump_always_to_file();
+  makeBusDevPair(dev, &busid, &devid);
+  device = device_lookup(busid, devid);
+  if (device == NULL || device->vm == NULL)
+    return -1;
+  return sticky_del(device->vendorid, device->deviceid, device->shortname);
 }
 
-always_t*
-policy_find_always(int bus, int device)
-{
-  return NULL;
-}
-
-vm_t*
+static vm_t*
 vm_focused(void)
 {
-  return NULL;
+  int domid;
+
+  xcdbus_input_get_focus_domid(g_xcbus, &domid);
+
+  return vm_lookup(domid);
+}
+
+int
+policy_auto_assign(device_t *device)
+{
+  sticky_t *sticky;
+  vm_t *vm = NULL;
+  int uivm;
+
+  sticky = sticky_lookup(device->vendorid, device->deviceid, device->shortname);
+  if (sticky != NULL)
+    vm = vm_lookup_by_uuid(sticky->uuid);
+  if (vm == NULL && auto_assign_to_focused_vm)
+    vm = vm_focused();
+
+  property_get_com_citrix_xenclient_xenmgr_vm_domid_(g_xcbus, XENMGR, UIVM_PATH, &uivm);
+  if (vm != NULL && vm->domid != 0 && vm->domid != uivm)
+    {
+      int res;
+
+      device->vm = vm;
+      res = usbowls_plug_device(vm->domid, device->busid, device->devid);
+      if (res != 0)
+	device->vm = NULL;
+      return res;
+    }
+
+  return -1;
 }
 
 void
-policy_init()
+policy_init(void)
 {
-  INIT_LIST_HEAD(&alwayss.list);
-}
+  INIT_LIST_HEAD(&stickys.list);
 
-vm_t*
-policy_auto_assign(int bus, int device)
-{
-  always_t *always;
-  vm_t *vm;
-
-  always = policy_find_always(bus, device);
-  if (always != NULL)
-    return vm_lookup_by_uuid(always->uuid);
-  if (auto_assign_to_focused_vm)
-    {
-      vm = vm_focused();
-      if (vm != NULL && vm->domid != 0)
-	return vm;
-    }
-
-  return NULL;
+  policy_read_stickys_from_file();
 }

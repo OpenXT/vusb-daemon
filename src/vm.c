@@ -27,12 +27,9 @@ vm_lookup(const int domid)
   list_for_each(pos, &vms.list) {
     vm = list_entry(pos, vm_t, list);
     if (vm->domid == domid) {
-      break;
+      return vm;
     }
   }
-
-  if (vm->domid == domid)
-    return vm;
 
   return NULL;
 }

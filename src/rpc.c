@@ -55,22 +55,6 @@ void rpc_init(void)
     }
 }
 
-/* Generate a device ID
- * param    bus_num              number of bus device is on
- * param    dev_num              device number within bus
- * return                        device id
- */
-static int makeDeviceId(int bus_num, int dev_num)
-{
-  return ((bus_num - 1) << 7) + (dev_num - 1);
-}
-
-static void makeBusDevPair(int devid, int *bus_num, int *dev_num)
-{
-  *bus_num = (devid >> 7) + 1;
-  *dev_num = (devid & 0x7F) + 1;
-}
-
 static int add_vm(int domid)
 {
   char *uuid;
@@ -254,13 +238,13 @@ gboolean ctxusb_daemon_assign_device(CtxusbDaemonObject *this,
   }
 
   device->vm = vm;
-
   ret = usbowls_plug_device(vm->domid, device->busid, device->devid);
   if (ret != 0) {
     g_set_error(error,
 		DBUS_GERROR,
 		DBUS_GERROR_FAILED,
 		"Failed to plug device %d-%d to VM %d", device->busid, device->devid, vm->domid);
+    device->vm = NULL;
     return FALSE;
   }
 
@@ -314,7 +298,12 @@ gboolean ctxusb_daemon_unassign_device(CtxusbDaemonObject *this,
 gboolean ctxusb_daemon_set_sticky(CtxusbDaemonObject *this,
                                   gint IN_dev_id, gint IN_sticky, GError **error)
 {
-    return TRUE;
+  if (IN_sticky == 0)
+    policy_unset_sticky(IN_dev_id);
+  else
+    policy_set_sticky(IN_dev_id);
+
+  return TRUE;
 }
 
 gboolean ctxusb_daemon_state(CtxusbDaemonObject *this,

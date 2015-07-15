@@ -78,12 +78,15 @@ main() {
   int nfds;
   int udevfd;
 
-  /* Setup dbus */
-  rpc_init();
-
   /* Init global VMs and devices lists */
   INIT_LIST_HEAD(&vms.list);
   INIT_LIST_HEAD(&devices.list);
+
+  /* Setup dbus */
+  rpc_init();
+
+  /* Load the policy bits */
+  policy_init();
 
   /* Populate the VM list */
   fill_vms();

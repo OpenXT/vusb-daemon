@@ -59,8 +59,8 @@ int
 udev_maybe_add_device(struct udev_device *dev)
 {
   const char *value;
-  int busnum;
-  int devnum;
+  int busnum, devnum;
+  int vendorid, deviceid;
   char *vendor = NULL;
   char *model;
   char *type = NULL;
@@ -69,6 +69,7 @@ udev_maybe_add_device(struct udev_device *dev)
   unsigned char subclass;
   unsigned char protocol;
   int size;
+  device_t *device;
 
   /* Make sure the device is useful for us */
   value = udev_device_get_sysname(dev);
@@ -87,6 +88,16 @@ udev_maybe_add_device(struct udev_device *dev)
     return -1;
   else
     devnum = strtol(value, NULL, 10);
+  value = udev_device_get_sysattr_value(dev, "idVendor");
+  if (value == NULL)
+    return -1;
+  else
+    vendorid = strtol(value, NULL, 10);
+  value = udev_device_get_sysattr_value(dev, "idProduct");
+  if (value == NULL)
+    return -1;
+  else
+    deviceid = strtol(value, NULL, 10);
   value = udev_device_get_sysattr_value(dev, "bDeviceClass");
   if (value == NULL)
     return -1;
@@ -161,7 +172,9 @@ udev_maybe_add_device(struct udev_device *dev)
   }
 
   /* Finally add the device */
-  device_add(busnum, devnum, model, vendor, sysname, 0);
+  device = device_add(busnum, devnum, vendorid, deviceid, model, vendor, sysname);
+
+  policy_auto_assign(device);
 
   return 0;
 }

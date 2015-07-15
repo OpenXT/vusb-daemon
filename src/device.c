@@ -27,12 +27,9 @@ device_lookup(int busid, int devid)
   list_for_each(pos, &devices.list) {
     device = list_entry(pos, device_t, list);
     if (device->busid == busid && device->devid == devid) {
-      break;
+      return device;
     }
   }
-
-  if (device->busid == busid && device->devid == devid)
-    return device;
 
   return NULL;
 }
@@ -62,13 +59,14 @@ device_bind_to_dom0(int busid, int devid)
 }
 
 /* Add a device to the global list of devices */
-int
+device_t*
 device_add(int  busid,
 	   int  devid,
+	   int  vendorid,
+	   int  deviceid,
 	   char *shortname,
 	   char *longname,
-	   char *sysname,
-	   int domid)
+	   char *sysname)
 {
   device_t *device;
 
@@ -76,19 +74,15 @@ device_add(int  busid,
 
   device->busid = busid;
   device->devid = devid;
+  device->vendorid = vendorid;
+  device->deviceid = deviceid;
   device->shortname = shortname;
   device->longname = longname;
   device->sysname = sysname;
-  if (domid != 0)
-    device->vm = vm_lookup(domid);
-  else
-    device->vm = NULL; /* The UI isn't happy if the device is assigned to dom0 */
+  device->vm = NULL; /* The UI isn't happy if the device is assigned to dom0 */
   list_add(&device->list, &devices.list);
 
-  /* FIXME: bind to dom0 if domid == 0? */
-  /* device_bind_to_dom0(busid, devid); */
-
-  return 0;
+  return device;
 }
 
 /* Remove a device from the global list of devices */

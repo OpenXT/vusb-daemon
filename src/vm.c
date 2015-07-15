@@ -56,9 +56,10 @@ vm_lookup_by_uuid(const char *uuid)
 static char*
 uuid_copy_and_sanitize(const char *uuid)
 {
-  char *res = malloc(UUID_LENGTH);
+  char *res;
   int i;
 
+  res = malloc(UUID_LENGTH);
   for (i = 0; i < UUID_LENGTH - 1; ++i)
     res[i] = (uuid[i] == '_') ? '-' : uuid[i];
 

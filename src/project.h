@@ -197,7 +197,7 @@ void  xenstore_list_domain_devs(dominfo_t *domp);
 int   xenstore_init(void);
 int   xenstore_deinit(void);
 
-void  policy_init(void);
+int   policy_init(void);
 int   policy_auto_assign(device_t *device);
 int   policy_set_sticky(int dev);
 int   policy_unset_sticky(int dev);

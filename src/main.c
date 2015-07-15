@@ -86,7 +86,11 @@ main() {
   rpc_init();
 
   /* Load the policy bits */
-  policy_init();
+  ret = policy_init();
+  if (ret != 0) {
+    xd_log(LOG_ERR, "Unable to initialize the policy bits");
+    return -1;
+  }
 
   /* Populate the VM list */
   fill_vms();

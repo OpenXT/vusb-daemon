@@ -59,21 +59,34 @@ policy_dump_stickys_to_file(void)
 }
 
 static void
-sticky_add(int vendorid,
-	   int deviceid,
-	   const char *serial,
-	   const char *uuid)
+sticky_add_noalloc(int vendorid,
+		    int deviceid,
+		    char *serial,
+		    char *uuid)
 {
   sticky_t *sticky;
 
   sticky = malloc(sizeof(sticky_t));
   sticky->vendorid = vendorid;
   sticky->deviceid = deviceid;
-  sticky->serial = malloc(strlen(serial));
-  strcpy(sticky->serial, serial);
-  sticky->uuid = malloc(strlen(uuid));
-  strcpy(sticky->uuid, uuid);
+  sticky->serial = serial;
+  sticky->uuid = uuid;
   list_add(&sticky->list, &stickys.list);
+}
+
+static void
+sticky_add(int vendorid,
+	   int deviceid,
+	   const char *serial,
+	   const char *uuid)
+{
+  char *newserial, *newuuid;
+
+  newserial = malloc(strlen(serial));
+  strcpy(newserial, serial);
+  newuuid = malloc(strlen(uuid));
+  strcpy(newuuid, uuid);
+  sticky_add_noalloc(vendorid, deviceid, newserial, newuuid);
 }
 
 static sticky_t*
@@ -177,7 +190,7 @@ policy_read_stickys_from_file(void)
 	break;
 
       /* All set. Create the rule item and set ret to success (0) */
-      sticky_add(vendorid, deviceid, serial, uuid);
+      sticky_add_noalloc(vendorid, deviceid, serial, uuid);
       ret = 0;
     }
 
@@ -253,10 +266,10 @@ policy_auto_assign(device_t *device)
   return -1;
 }
 
-void
+int
 policy_init(void)
 {
   INIT_LIST_HEAD(&stickys.list);
 
-  policy_read_stickys_from_file();
+  return policy_read_stickys_from_file();
 }

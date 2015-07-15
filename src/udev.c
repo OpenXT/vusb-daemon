@@ -56,7 +56,7 @@ check_sysname(const char *s)
 }
 
 int
-udev_maybe_add_device(struct udev_device *dev)
+udev_maybe_add_device(struct udev_device *dev, int auto_assign)
 {
   const char *value;
   int busnum, devnum;
@@ -174,7 +174,8 @@ udev_maybe_add_device(struct udev_device *dev)
   /* Finally add the device */
   device = device_add(busnum, devnum, vendorid, deviceid, model, vendor, sysname);
 
-  policy_auto_assign(device);
+  if (auto_assign > 0)
+    policy_auto_assign(device);
 
   return 0;
 }
@@ -257,7 +258,7 @@ udev_fill_devices(void)
   udev_list_entry_foreach(udev_device_entry, udev_device_list) {
       path = udev_list_entry_get_name(udev_device_entry);
       udev_device = udev_device_new_from_syspath(udev, path);
-      udev_maybe_add_device(udev_device);
+      udev_maybe_add_device(udev_device, 0);
       udev_device_unref(udev_device);
   }
 
@@ -283,7 +284,7 @@ udev_event(void)
     printf("   Action: %s\n", action);
     if (!strcmp(action, "add")) {
       printf("ADDING IT\n");
-      udev_maybe_add_device(dev);
+      udev_maybe_add_device(dev, 1);
     }
     if (!strcmp(action, "remove")) {
       printf("REMOVING IT\n");

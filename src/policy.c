@@ -102,7 +102,7 @@ sticky_lookup(int vendorid,
     /* Check for a match. Ignore any trailing info in the serial. */
     if (sticky->vendorid == vendorid &&
 	sticky->deviceid == deviceid &&
-	!strncmp(sticky->serial, serial, strlen(serial))) {
+	!strncmp(sticky->serial, serial, strlen(sticky->serial))) {
       return sticky;
     }
   }

@@ -138,7 +138,7 @@ policy_read_stickys_from_file(void)
   if (file == NULL)
     {
       xd_log(LOG_WARN, "No USB sticky loaded as the file couldn't be opened");
-      return -1;
+      return 0;
     }
   while (fgets(line, 1024, file) != NULL)
     {

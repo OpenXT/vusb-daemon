@@ -92,12 +92,12 @@ udev_maybe_add_device(struct udev_device *dev, int auto_assign)
   if (value == NULL)
     return -1;
   else
-    vendorid = strtol(value, NULL, 10);
+    vendorid = strtol(value, NULL, 16);
   value = udev_device_get_sysattr_value(dev, "idProduct");
   if (value == NULL)
     return -1;
   else
-    deviceid = strtol(value, NULL, 10);
+    deviceid = strtol(value, NULL, 16);
   value = udev_device_get_sysattr_value(dev, "bDeviceClass");
   if (value == NULL)
     return -1;

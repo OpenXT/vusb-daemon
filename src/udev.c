@@ -55,6 +55,32 @@ check_sysname(const char *s)
   return 0;
 }
 
+/* Ignore product strings that are actually just a hex/dec number */
+static int
+check_product(const char *s)
+{
+  int len;
+
+  len = strlen(s);
+  /* Skip any "0x" at the beggining */
+  if (len >= 3 && *s == '0' && *(s + 1) == 'x')
+    s += 2;
+
+  if (len > 4)
+    return 0;
+
+  while (*s != '\0') {
+    if ((*s < '0' || *s > '9') &&
+	(*s < 'a' || *s > 'f') &&
+	(*s < 'A' || *s > 'F'))
+      /* This is not a hex/dec digit, all good */
+      return 0;
+    s++;
+  }
+
+  return -1;
+}
+
 static int
 udev_maybe_add_device(struct udev_device *dev, int auto_assign)
 {
@@ -63,7 +89,6 @@ udev_maybe_add_device(struct udev_device *dev, int auto_assign)
   int vendorid, deviceid;
   char *vendor = NULL;
   char *model;
-  char *type = NULL;
   char *sysname = NULL;
   unsigned char class;
   unsigned char subclass;
@@ -126,49 +151,55 @@ udev_maybe_add_device(struct udev_device *dev, int auto_assign)
   if (class == 0x09)
     return -1;
 
-  /* The devices passes all the tests, we want it in the list */
+  /* The device passes all the tests, we want it in the list */
 
-  /* Get the type string for the device. 0 is not a "real" class */
-  if (class != 0)
-    type = device_type(class, subclass, protocol);
-
-  /* Using udev to look up the device vendor in usb.ids.
-     If no vendor is found in the database, ask the device itself.
-     If no vendor is found at all, the device longname will be NULL. */
-  value = udev_device_get_property_value(dev, "ID_VENDOR_FROM_DATABASE");
+  /* Read the device manufacturer */
+  value = udev_device_get_sysattr_value(dev, "manufacturer");
   if (value == NULL)
-    value = udev_device_get_property_value(dev, "ID_VENDOR");
-  if (value != NULL) {
-    vendor = malloc(strlen(value) + 1);
-    strcpy(vendor, value);
+    /* If it doesn't have a vendor, use udev to look it up in usb.ids. */
+    value = udev_device_get_property_value(dev, "ID_VENDOR_FROM_DATABASE");
+  if (value == NULL) {
+    /* usb.ids doesn't know about it either...
+       default to "Unknown vendor" */
+    size = strlen("Unknown vendor") + 1;
+    vendor = malloc(size);
+    snprintf(vendor, size, "Unknown vendor");
+  } else {
+    /* Vendor was found in usb.ids */
+    size = strlen(value) + 1;
+    vendor = malloc(size);
+    snprintf(vendor, size, "%s", value);
   }
 
-  /* Using udev to look up the device model in usb.ids.
-     If no model is found in the database, ask the device itself.
-     Use model and type to build the shortname or default to "unknown" */
-  value = udev_device_get_property_value(dev, "ID_MODEL_FROM_DATABASE");
-  if (value == NULL)
-    value = udev_device_get_property_value(dev, "ID_MODEL");
-  if (value != NULL) {
+  /* Read the device name. Hopefuly it's not garbage... */
+  /* As a basic filter, discard names that are 4 digits long or less. */
+  value = udev_device_get_sysattr_value(dev, "product");
+  if (value == NULL || check_product(value) != 0)
+    /* It doesn't have a name. Use udev to look it up in usb.ids. */
+    value = udev_device_get_property_value(dev, "ID_MODEL_FROM_DATABASE");
+  if (value == NULL) {
+    /* usb.ids doesn't know about it either...
+       default to "<vendor> device - <type>" */
+    /* Get the type string for the device. 0 is not a "real" class */
+    char *type = NULL;
+
+    if (class != 0)
+      type = device_type(class, subclass, protocol);
     if (type != NULL) {
-      size = strlen(type) + 3 + strlen(value) + 1;
+      /* There's a type, let's do "<vendor> device - <type>" */
+      size = strlen(vendor) + strlen(" device - ") + strlen(type) + 1;
       model = malloc(size);
-      snprintf(model, size, "%s - %s", value, type);
+      snprintf(model, size, "%s device - %s", vendor, type);
     } else {
-      size = strlen(value) + 1;
+      /* There's no type, let's just do "<vendor> device" */
+      size = strlen(vendor) + strlen(" device") + 1;
       model = malloc(size);
-      snprintf(model, size, "%s", value);
+      snprintf(model, size, "%s device", vendor);
     }
   } else {
-    if (type != NULL) {
-      size = strlen(type) + 1;
-      model = malloc(size);
-      snprintf(model, size, "%s", type);
-    } else {
-      size = strlen("unknown" + 1);
-      model = malloc(size);
-      snprintf(model, size, "unknown");
-    }
+    /* Model was found in usb.ids */
+    model = malloc(strlen(value) + 1);
+    strcpy(model, value);
   }
 
   /* Finally add the device */

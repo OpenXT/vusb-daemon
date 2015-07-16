@@ -82,9 +82,9 @@ sticky_add(int vendorid,
 {
   char *newserial, *newuuid;
 
-  newserial = malloc(strlen(serial));
+  newserial = malloc(strlen(serial) + 1);
   strcpy(newserial, serial);
-  newuuid = malloc(strlen(uuid));
+  newuuid = malloc(strlen(uuid) + 1);
   strcpy(newuuid, uuid);
   sticky_add_noalloc(vendorid, deviceid, newserial, newuuid);
 }
@@ -99,9 +99,10 @@ sticky_lookup(int vendorid,
 
   list_for_each(pos, &stickys.list) {
     sticky = list_entry(pos, sticky_t, list);
+    /* Check for a match. Ignore any trailing info in the serial. */
     if (sticky->vendorid == vendorid &&
 	sticky->deviceid == deviceid &&
-	!strcmp(sticky->serial, serial)) {
+	!strncmp(sticky->serial, serial, strlen(serial))) {
       return sticky;
     }
   }

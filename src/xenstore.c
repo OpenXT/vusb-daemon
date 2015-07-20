@@ -82,7 +82,7 @@ xenstore_add_dir(xs_transaction_t xt, char *path, int d0, int p0, int d1, int p1
   perms[1].id = d1;
   if (xs_set_permissions(xs_handle, xt, path, perms, 2) == false) {
     xd_log(LOG_ERR, "XenStore error setting permissions on %s",
-	   path);
+           path);
     xenstore_remove(xt, path);
     return (-1);
   }
@@ -91,7 +91,7 @@ xenstore_add_dir(xs_transaction_t xt, char *path, int d0, int p0, int d1, int p1
 }
 
 char*
-xenstore_dom_read (unsigned int domid, const char *format, ...)
+xenstore_dom_read(unsigned int domid, const char *format, ...)
 {
   char *domain_path;
   va_list arg;
@@ -99,7 +99,7 @@ xenstore_dom_read (unsigned int domid, const char *format, ...)
   char *buff = NULL;
   int res;
 
-  domain_path = xs_get_domain_path (xs_handle, domid);
+  domain_path = xs_get_domain_path(xs_handle, domid);
 
   if (!domain_path)
     return NULL;
@@ -167,14 +167,14 @@ static char*
 xenstore_dev_fepath(dominfo_t *domp, char *type, int devnum)
 {
   return (xasprintf("%s/device/%s/%d", domp->di_dompath, type,
-		    devnum));
+                    devnum));
 }
 
 static char*
 xenstore_dev_bepath(dominfo_t *domp, char *type, int devnum)
 {
   return (xasprintf("%s/backend/%s/%d/%d", xs_dom0path, type,
-		    domp->di_domid, devnum));
+                    domp->di_domid, devnum));
 }
 
 void
@@ -208,7 +208,7 @@ test_offline(dominfo_t *domp, usbinfo_t *usbp)
   xenstore_get_xb_states(domp, usbp, &f, &b);
   printf("%d %d\n", f, b);
   return (f == XB_UNKNOWN || f == XB_CLOSED) &&
-         (b == XB_UNKNOWN || b == XB_CLOSED);
+    (b == XB_UNKNOWN || b == XB_CLOSED);
 }
 
 void
@@ -248,7 +248,7 @@ xenstore_create_usb(dominfo_t *domp, usbinfo_t *usbp)
   xs_transaction_t trans;
 
   xd_log(LOG_DEBUG, "Creating VUSB node for %d.%d",
-	 usbp->usb_bus, usbp->usb_device);
+         usbp->usb_bus, usbp->usb_device);
 
   /*
    * Construct Xenstore paths for both the front and back ends.
@@ -263,10 +263,10 @@ xenstore_create_usb(dominfo_t *domp, usbinfo_t *usbp)
      * Make directories for both front and back ends
      */
     if (xenstore_add_dir(trans, bepath, 0, XS_PERM_NONE, domp->di_domid,
-		   XS_PERM_READ))
+                         XS_PERM_READ))
       break;
     if (xenstore_add_dir(trans, fepath, domp->di_domid, XS_PERM_NONE, 0,
-		   XS_PERM_READ))
+                         XS_PERM_READ))
       break;
 
     /*
@@ -299,20 +299,20 @@ xenstore_create_usb(dominfo_t *domp, usbinfo_t *usbp)
     if (xenstore_set_keyval(trans, bepath, "frontend-id", value))
       break;
     snprintf(value, sizeof (value), "%d.%d", usbp->usb_bus,
-	     usbp->usb_device);
+             usbp->usb_device);
     if (xenstore_set_keyval(trans, bepath, "physical-device", value))
       break;
 
     if (xs_transaction_end(xs_handle, trans, false) == false) {
       if (errno == EAGAIN)
-	continue;
+        continue;
       break;
     }
     free(fepath);
     free(bepath);
 
     xd_log(LOG_DEBUG, "Finished creating VUSB node for %d.%d",
-	   usbp->usb_bus, usbp->usb_device);
+           usbp->usb_bus, usbp->usb_device);
 
     return (0);
   }
@@ -336,7 +336,7 @@ xenstore_destroy_usb(dominfo_t *domp, usbinfo_t *usbp)
   int i;
 
   xd_log(LOG_INFO, "Deleting VUSB node %d for %d.%d",
-	 usbp->usb_virtid, usbp->usb_bus, usbp->usb_device);
+         usbp->usb_virtid, usbp->usb_bus, usbp->usb_device);
 
   bepath = xenstore_dev_bepath(domp, "vusb", usbp->usb_virtid);
   fepath = xenstore_dev_fepath(domp, "vusb", usbp->usb_virtid);
@@ -382,7 +382,7 @@ xenstore_init(void)
 
   if (xs_dom0path == NULL) {
     xd_log(LOG_ERR, "Could not get domain 0 path from XenStore");
-     return 1;
+    return 1;
   }
 
   return 0;

@@ -25,36 +25,51 @@
 static DBusConnection  *g_dbus_conn = NULL;
 static DBusGConnection *g_glib_dbus_conn = NULL;
 
-/*********************************************/
-/** CTXUSB_DAEMON dbus object implementation */
-/******************vvvvvvvvv******************/
+/* CTXUSB_DAEMON dbus object implementation */
 #include "rpcgen/ctxusb_daemon_server_obj.h"
 
+
+/**
+ * @brief Initialize the DBus RPC bits
+ *
+ * Grab the bus, initialize the xcdbus handle and export the server.
+ */
 void rpc_init(void)
 {
-    CtxusbDaemonObject *server_obj = NULL;
-    /* have to initialise glib type system */
-    g_type_init();
+  CtxusbDaemonObject *server_obj = NULL;
+  /* have to initialise glib type system */
+  g_type_init();
 
-    g_glib_dbus_conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, NULL);
-    if (!g_glib_dbus_conn) {
-        xd_log(LOG_ERR, "no bus");
-        exit(1);
-    }
-    g_dbus_conn = dbus_g_connection_get_connection(g_glib_dbus_conn);
-    g_xcbus = xcdbus_init2(SERVICE, g_glib_dbus_conn);
-    if (!g_xcbus) {
-        xd_log(LOG_ERR, "failed to init dbus connection / grab service name");
-        exit(1);
-    }
-    /* export server object */
-    server_obj = ctxusb_daemon_export_dbus(g_glib_dbus_conn, SERVICE_OBJ_PATH);
-    if (!server_obj) {
-        xd_log(LOG_ERR, "failed to export server object");
-        exit(1);
-    }
+  g_glib_dbus_conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, NULL);
+  if (!g_glib_dbus_conn) {
+    xd_log(LOG_ERR, "no bus");
+    exit(1);
+  }
+  g_dbus_conn = dbus_g_connection_get_connection(g_glib_dbus_conn);
+  g_xcbus = xcdbus_init2(SERVICE, g_glib_dbus_conn);
+  if (!g_xcbus) {
+    xd_log(LOG_ERR, "failed to init dbus connection / grab service name");
+    exit(1);
+  }
+  /* export server object */
+  server_obj = ctxusb_daemon_export_dbus(g_glib_dbus_conn, SERVICE_OBJ_PATH);
+  if (!server_obj) {
+    xd_log(LOG_ERR, "failed to export server object");
+    exit(1);
+  }
 }
 
+/**
+ * @brief Helper to add a VM
+ *
+ * Reads the VM path from xenstore and call vm_add() on the UUID part.
+ * We do this because VMs don't happen to have a "uuid" xenstore node...
+ * Example:
+ * @code
+ * /local/domain/2/vm = "/vm/00000000-0000-0000-0000-000000000001"
+ * @endcode
+ * @param domid The VM domid
+ */
 static int add_vm(int domid)
 {
   char *uuid;
@@ -71,27 +86,27 @@ static int add_vm(int domid)
 }
 
 gboolean ctxusb_daemon_set_policy_domuuid(
-    CtxusbDaemonObject *this,
-    const char *uuid,
-    const char *policy, GError **error)
+  CtxusbDaemonObject *this,
+  const char *uuid,
+  const char *policy, GError **error)
 {
   g_set_error(error,
-	      DBUS_GERROR,
-	      DBUS_GERROR_FAILED,
-	      "set_policy_domuuid hasn't been implemented yet");
+              DBUS_GERROR,
+              DBUS_GERROR_FAILED,
+              "set_policy_domuuid hasn't been implemented yet");
 
   return FALSE;
 }
 
 gboolean ctxusb_daemon_get_policy_domuuid(
-    CtxusbDaemonObject *this,
-    const char *uuid,
-    char **value, GError **error)
+  CtxusbDaemonObject *this,
+  const char *uuid,
+  char **value, GError **error)
 {
   g_set_error(error,
-	      DBUS_GERROR,
-	      DBUS_GERROR_FAILED,
-	      "get_policy_domuuid hasn't been implemented yet");
+              DBUS_GERROR,
+              DBUS_GERROR_FAILED,
+              "get_policy_domuuid hasn't been implemented yet");
 
   return FALSE;
 }
@@ -105,9 +120,9 @@ gboolean ctxusb_daemon_new_vm(CtxusbDaemonObject *this,
 
   if (ret) {
     g_set_error(error,
-		DBUS_GERROR,
-		DBUS_GERROR_FAILED,
-		"Failed to add VM %d", IN_dom_id);
+                DBUS_GERROR,
+                DBUS_GERROR_FAILED,
+                "Failed to add VM %d", IN_dom_id);
     return FALSE;
   } else {
     return TRUE;
@@ -123,9 +138,9 @@ gboolean ctxusb_daemon_vm_stopped(CtxusbDaemonObject *this,
 
   if (ret) {
     g_set_error(error,
-		DBUS_GERROR,
-		DBUS_GERROR_FAILED,
-		"Failed to delete VM %d", IN_dom_id);
+                DBUS_GERROR,
+                DBUS_GERROR_FAILED,
+                "Failed to delete VM %d", IN_dom_id);
     return FALSE;
   } else {
     return TRUE;
@@ -170,9 +185,9 @@ gboolean ctxusb_daemon_get_device_info(CtxusbDaemonObject *this,
   }
   if (device->busid != busid || device->devid != devid) {
     g_set_error(error,
-		DBUS_GERROR,
-		DBUS_GERROR_FAILED,
-		"Device not found: %d", IN_dev_id);
+                DBUS_GERROR,
+                DBUS_GERROR_FAILED,
+                "Device not found: %d", IN_dev_id);
     return FALSE;
   }
   *OUT_name = g_strdup(device->shortname);
@@ -217,23 +232,23 @@ gboolean ctxusb_daemon_assign_device(CtxusbDaemonObject *this,
 
   if (device->busid != busid || device->devid != devid) {
     g_set_error(error,
-		DBUS_GERROR,
-		DBUS_GERROR_FAILED,
-		"Device not found: %d", IN_dev_id);
+                DBUS_GERROR,
+                DBUS_GERROR_FAILED,
+                "Device not found: %d", IN_dev_id);
     return FALSE;
   }
   if (strncmp(vm->uuid, IN_vm_uuid, UUID_LENGTH)) {
     g_set_error(error,
-		DBUS_GERROR,
-		DBUS_GERROR_FAILED,
-		"VM not found: %s", IN_vm_uuid);
+                DBUS_GERROR,
+                DBUS_GERROR_FAILED,
+                "VM not found: %s", IN_vm_uuid);
     return FALSE;
   }
   if (vm->domid < 0) {
     g_set_error(error,
-		DBUS_GERROR,
-		DBUS_GERROR_FAILED,
-		"Can't assign device %d to stopped VM %s", IN_dev_id, IN_vm_uuid);
+                DBUS_GERROR,
+                DBUS_GERROR_FAILED,
+                "Can't assign device %d to stopped VM %s", IN_dev_id, IN_vm_uuid);
     return FALSE;
   }
 
@@ -241,9 +256,9 @@ gboolean ctxusb_daemon_assign_device(CtxusbDaemonObject *this,
   ret = usbowls_plug_device(vm->domid, device->busid, device->devid);
   if (ret != 0) {
     g_set_error(error,
-		DBUS_GERROR,
-		DBUS_GERROR_FAILED,
-		"Failed to plug device %d-%d to VM %d", device->busid, device->devid, vm->domid);
+                DBUS_GERROR,
+                DBUS_GERROR_FAILED,
+                "Failed to plug device %d-%d to VM %d", device->busid, device->devid, vm->domid);
     device->vm = NULL;
     return FALSE;
   }
@@ -268,25 +283,25 @@ gboolean ctxusb_daemon_unassign_device(CtxusbDaemonObject *this,
   }
   if (device->busid != busid || device->devid != devid) {
     g_set_error(error,
-		DBUS_GERROR,
-		DBUS_GERROR_FAILED,
-		"Device not found: %d", IN_dev_id);
+                DBUS_GERROR,
+                DBUS_GERROR_FAILED,
+                "Device not found: %d", IN_dev_id);
     return FALSE;
   }
 
   if (device->vm == NULL) {
     g_set_error(error,
-		DBUS_GERROR,
-		DBUS_GERROR_FAILED,
-		"Device %d is not currently assigned to a VM, can't unassign", IN_dev_id);
+                DBUS_GERROR,
+                DBUS_GERROR_FAILED,
+                "Device %d is not currently assigned to a VM, can't unassign", IN_dev_id);
     return FALSE;
   }
   ret = usbowls_unplug_device(device->vm->domid, device->busid, device->devid);
   if (ret != 0) {
     g_set_error(error,
-		DBUS_GERROR,
-		DBUS_GERROR_FAILED,
-		"Failed to unplug device %d-%d from VM %d", device->busid, device->devid, device->vm->domid);
+                DBUS_GERROR,
+                DBUS_GERROR_FAILED,
+                "Failed to unplug device %d-%d from VM %d", device->busid, device->devid, device->vm->domid);
     return FALSE;
   }
 
@@ -309,11 +324,11 @@ gboolean ctxusb_daemon_set_sticky(CtxusbDaemonObject *this,
 gboolean ctxusb_daemon_state(CtxusbDaemonObject *this,
                              char **OUT_state, GError **error)
 {
-    return TRUE;
+  return TRUE;
 }
 
 gboolean ctxusb_daemon_name_device(CtxusbDaemonObject *this,
                                    gint IN_dev_id, const char* IN_name, GError **error)
 {
-    return TRUE;
+  return TRUE;
 }

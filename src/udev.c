@@ -28,10 +28,10 @@ udev_init(void)
   /* Initialise udev monitor */
   udev_handle = udev_new();
   if(udev_handle == NULL)
-    {
-      printf("Can't create udev handle");
-      return -1;
-    }
+  {
+    printf("Can't create udev handle");
+    return -1;
+  }
 
   udev_mon = udev_monitor_new_from_netlink(udev_handle, "udev");
   udev_monitor_filter_add_match_subsystem_devtype(udev_mon, "usb", "usb_device");
@@ -104,8 +104,8 @@ check_product(const char *s)
 
   while (*s != '\0') {
     if ((*s < '0' || *s > '9') &&
-	(*s < 'a' || *s > 'f') &&
-	(*s < 'A' || *s > 'F'))
+        (*s < 'a' || *s > 'f') &&
+        (*s < 'A' || *s > 'F'))
       /* This is not a hex/dec digit, all good */
       return 0;
     s++;
@@ -350,10 +350,10 @@ udev_fill_devices(void)
   udev_enumerate_scan_devices(enumerate);
   udev_device_list = udev_enumerate_get_list_entry(enumerate);
   udev_list_entry_foreach(udev_device_entry, udev_device_list) {
-      path = udev_list_entry_get_name(udev_device_entry);
-      udev_device = udev_device_new_from_syspath(udev_handle, path);
-      udev_maybe_add_device(udev_device, 0);
-      udev_device_unref(udev_device);
+    path = udev_list_entry_get_name(udev_device_entry);
+    udev_device = udev_device_new_from_syspath(udev_handle, path);
+    udev_maybe_add_device(udev_device, 0);
+    udev_device_unref(udev_device);
   }
 
   /* Cleanup */
@@ -379,11 +379,11 @@ udev_event(void)
     if (!strcmp(action, "add")) {
       device = udev_maybe_add_device(dev, 1);
       if (device != NULL) {
-	printf("   Mouse: %d\n", device->mouse);
-	printf("   Keyboard: %d\n", device->keyboard);
-	printf("ADDED\n");
+        printf("   Mouse: %d\n", device->mouse);
+        printf("   Keyboard: %d\n", device->keyboard);
+        printf("ADDED\n");
       } else {
-	printf("NOT ADDED\n");
+        printf("NOT ADDED\n");
       }
     }
     if (!strcmp(action, "remove")) {

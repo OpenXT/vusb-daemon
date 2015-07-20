@@ -42,27 +42,27 @@ policy_dump_stickys_to_file(void)
 
   file = fopen(STICKY_FILE_PATH, "w");
   if (file == NULL)
-    {
-      xd_log(LOG_WARN, "No USB sticky loaded as the file couldn't be opened");
-      return -1;
-    }
+  {
+    xd_log(LOG_WARN, "No USB sticky loaded as the file couldn't be opened");
+    return -1;
+  }
   list_for_each(pos, &stickys.list)
-    {
-      sticky_t *sticky;
+  {
+    sticky_t *sticky;
 
-      sticky = list_entry(pos, sticky_t, list);
-      snprintf(line, 1024, "%X:%X:\"%s\"=\"%s\"\n",
-	       sticky->vendorid, sticky->deviceid, sticky->serial, sticky->uuid);
-      fputs(line, file);
-    }
+    sticky = list_entry(pos, sticky_t, list);
+    snprintf(line, 1024, "%X:%X:\"%s\"=\"%s\"\n",
+             sticky->vendorid, sticky->deviceid, sticky->serial, sticky->uuid);
+    fputs(line, file);
+  }
   fclose(file);
 }
 
 static void
 sticky_add_noalloc(int vendorid,
-		    int deviceid,
-		    char *serial,
-		    char *uuid)
+                   int deviceid,
+                   char *serial,
+                   char *uuid)
 {
   sticky_t *sticky;
 
@@ -76,9 +76,9 @@ sticky_add_noalloc(int vendorid,
 
 static void
 sticky_add(int vendorid,
-	   int deviceid,
-	   const char *serial,
-	   const char *uuid)
+           int deviceid,
+           const char *serial,
+           const char *uuid)
 {
   char *newserial, *newuuid;
 
@@ -91,8 +91,8 @@ sticky_add(int vendorid,
 
 static sticky_t*
 sticky_lookup(int vendorid,
-	      int deviceid,
-	      const char *serial)
+              int deviceid,
+              const char *serial)
 {
   struct list_head *pos;
   sticky_t *sticky;
@@ -101,8 +101,8 @@ sticky_lookup(int vendorid,
     sticky = list_entry(pos, sticky_t, list);
     /* Check for a match. Ignore any trailing info in the serial. */
     if (sticky->vendorid == vendorid &&
-	sticky->deviceid == deviceid &&
-	!strncmp(sticky->serial, serial, strlen(sticky->serial))) {
+        sticky->deviceid == deviceid &&
+        !strncmp(sticky->serial, serial, strlen(sticky->serial))) {
       return sticky;
     }
   }
@@ -112,8 +112,8 @@ sticky_lookup(int vendorid,
 
 static int
 sticky_del(int vendorid,
-	   int deviceid,
-	   const char *serial)
+           int deviceid,
+           const char *serial)
 {
   sticky_t *sticky;
 
@@ -137,63 +137,63 @@ policy_read_stickys_from_file(void)
 
   file = fopen(STICKY_FILE_PATH, "r");
   if (file == NULL)
-    {
-      xd_log(LOG_WARN, "No USB sticky loaded as the file couldn't be opened");
-      return 0;
-    }
+  {
+    xd_log(LOG_WARN, "No USB sticky loaded as the file couldn't be opened");
+    return 0;
+  }
   while (fgets(line, 1024, file) != NULL)
-    {
-      char *begin = line;
-      char *end;
-      int size;
-      int vendorid, deviceid;
-      char *serial, *uuid;
+  {
+    char *begin = line;
+    char *end;
+    int size;
+    int vendorid, deviceid;
+    char *serial, *uuid;
 
-      /* Default to failure if we break */
-      ret = -2;
+    /* Default to failure if we break */
+    ret = -2;
 
-      /* Read the vendorid and make sure it's followed by ':' */
-      vendorid = strtol(begin, &end, 16);
-      if (end == NULL || *end != ':')
-	break;
-      begin = end + 1;
+    /* Read the vendorid and make sure it's followed by ':' */
+    vendorid = strtol(begin, &end, 16);
+    if (end == NULL || *end != ':')
+      break;
+    begin = end + 1;
 
-      /* Read the deviceid and make sure it's followed by ':' and '"' */
-      deviceid = strtol(begin, &end, 16);
-      if (end == NULL || *end != ':' || *(end + 1) != '"')
-	break;
-      begin = end + 2;
+    /* Read the deviceid and make sure it's followed by ':' and '"' */
+    deviceid = strtol(begin, &end, 16);
+    if (end == NULL || *end != ':' || *(end + 1) != '"')
+      break;
+    begin = end + 2;
 
-      /* Read the serial and make sure it's followed by '"', '=', and '"' */
-      end = strchr(begin, '"');
-      if (end == NULL)
-	break;
-      size = end - begin;
-      serial = malloc(size + 1);
-      strncpy(serial, begin, size);
-      serial[size] = '\0';
-      if (end == NULL || *end != '"' || *(end + 1) != '=' || *(end + 2) != '"')
-	break;
-      begin = end + 3;
+    /* Read the serial and make sure it's followed by '"', '=', and '"' */
+    end = strchr(begin, '"');
+    if (end == NULL)
+      break;
+    size = end - begin;
+    serial = malloc(size + 1);
+    strncpy(serial, begin, size);
+    serial[size] = '\0';
+    if (end == NULL || *end != '"' || *(end + 1) != '=' || *(end + 2) != '"')
+      break;
+    begin = end + 3;
 
-      /* Read the uuid and make sure it's UUID_LENGTH, and followed by '"'.
-         The end of the line will be discarded */
-      end = strchr(begin, '"');
-      if (end == NULL)
-	break;
-      size = end - begin;
-      if (size != UUID_LENGTH - 1)
-	break;
-      uuid = malloc(size + 1);
-      strncpy(uuid, begin, size);
-      uuid[size] = '\0';
-      if (end == NULL || *end != '"')
-	break;
+    /* Read the uuid and make sure it's UUID_LENGTH, and followed by '"'.
+       The end of the line will be discarded */
+    end = strchr(begin, '"');
+    if (end == NULL)
+      break;
+    size = end - begin;
+    if (size != UUID_LENGTH - 1)
+      break;
+    uuid = malloc(size + 1);
+    strncpy(uuid, begin, size);
+    uuid[size] = '\0';
+    if (end == NULL || *end != '"')
+      break;
 
-      /* All set. Create the rule item and set ret to success (0) */
-      sticky_add_noalloc(vendorid, deviceid, serial, uuid);
-      ret = 0;
-    }
+    /* All set. Create the rule item and set ret to success (0) */
+    sticky_add_noalloc(vendorid, deviceid, serial, uuid);
+    ret = 0;
+  }
 
   if (ret == -2)
     xd_log(LOG_ERR, "Error while reading the USB sticky file");
@@ -254,15 +254,15 @@ policy_auto_assign(device_t *device)
 
   property_get_com_citrix_xenclient_xenmgr_vm_domid_(g_xcbus, XENMGR, UIVM_PATH, &uivm);
   if (vm != NULL && vm->domid != 0 && vm->domid != uivm)
-    {
-      int res;
+  {
+    int res;
 
-      device->vm = vm;
-      res = usbowls_plug_device(vm->domid, device->busid, device->devid);
-      if (res != 0)
-	device->vm = NULL;
-      return res;
-    }
+    device->vm = vm;
+    res = usbowls_plug_device(vm->domid, device->busid, device->devid);
+    if (res != 0)
+      device->vm = NULL;
+    return res;
+  }
 
   return -1;
 }

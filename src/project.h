@@ -16,6 +16,16 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/**
+ * @file project.h
+ * @author Jed Lejosne <lejosnej@ainfosec.com>
+ * @date 20 Jul 2015
+ * @brief Local project header
+ *
+ * Header local to the project that shouldn't be exported.
+ * Included by virtually every .c file in the project
+ */
+
 #ifndef __PROJECT_H__
 #define __PROJECT_H__
 
@@ -98,24 +108,35 @@
 
 #define xd_log(I, ...) { fprintf(stderr, ##__VA_ARGS__); fprintf(stderr, "\n"); }
 
+/**
+ * @brief VM structure
+ *
+ * VM structure used to keep a linked list of the running (or not) VMs.
+ */
 typedef struct {
-  struct list_head list;
-  int domid;
-  char *uuid;
+  struct list_head list; /**< Linux-kernel-style list item */
+  int domid;             /**< VM domid */
+  char *uuid;            /**< VM UUID */
 } vm_t;
 
+/**
+ * @brief Device structure
+ *
+ * Device structure used to keep a linked list of the USB devices
+ * present in the system, and their assigned VM
+ */
 typedef struct {
-  struct list_head list;
-  int busid;
-  int devid;
-  int vendorid;
-  int deviceid;
-  char *shortname;
-  char *longname;
-  char *sysname;
-  vm_t *vm;
-  int  keyboard;
-  int  mouse;
+  struct list_head list; /**< Linux-kernel-style list item */
+  int busid;             /**< Device bus */
+  int devid;             /**< Device ID on the bus */
+  int vendorid;          /**< Device vendor ID */
+  int deviceid;          /**< Device device ID */
+  char *shortname;       /**< Name shown in the UI, usually sysattr["product"] */
+  char *longname;        /**< Longer name shown nowhere I know of, usually sysattr["manufacturer"] */
+  char *sysname;         /**< Name in sysfs */
+  vm_t *vm;              /**< VM currently using the device, or NULL for dom0 */
+  int keyboard;          /**< 1 if we determined the device is a keyboard, 0 otherwise */
+  int mouse;             /**< 1 if we determined the device is a mouse, 0 otherwise */
 } device_t;
 
 typedef struct dominfo
@@ -128,8 +149,8 @@ typedef struct dominfo
 typedef struct usbinfo
 {
   int usb_virtid;
-  int usb_bus;	/* USB bus in the physical machine */
-  int usb_device;	/* USB device in the physical machine */
+  int usb_bus;  /* USB bus in the physical machine */
+  int usb_device;       /* USB device in the physical machine */
   int usb_vendor;
   int usb_product;
 } usbinfo_t;
@@ -139,16 +160,26 @@ enum XenBusStates {
   XB_CLOSING, XB_CLOSED
 };
 
-/* Generate a device ID
- * param    bus_num              number of bus device is on
- * param    dev_num              device number within bus
- * return                        device id
+/**
+ * @brief Generate a device ID
+ *
+ * Generate a single ID from the bus and device IDs
+ * @param bus_num Device bus
+ * @param dev_num Device ID on the bus
  */
 static int makeDeviceId(int bus_num, int dev_num)
 {
   return ((bus_num - 1) << 7) + (dev_num - 1);
 }
 
+/**
+ * @brief Get the bus and device IDs of a device
+ *
+ * Extract bus and device IDs from a single device ID
+ * @param devid   The single ID
+ * @param bus_num Resulting device bus
+ * @param dev_num Resulting Device ID
+ */
 static void makeBusDevPair(int devid, int *bus_num, int *dev_num)
 {
   *bus_num = (devid >> 7) + 1;
@@ -179,12 +210,12 @@ int   udev_bind_device_to_dom0(struct udev_device *dev);
 
 device_t*   device_lookup(int busid, int devid);
 device_t*   device_add(int busid, int devid, int vendorid, int deviceid,
-		       char *shortname, char *longname, char *sysname);
+                       char *shortname, char *longname, char *sysname);
 int         device_del(int  busid, int  devid);
 int         device_bind_to_dom0(int busid, int devid);
 int         device_bind_to_dom0_by_sysname(const char *name);
 char*       device_type(unsigned char class, unsigned char subclass,
-		  unsigned char protocol);
+                        unsigned char protocol);
 
 vm_t* vm_lookup(const int domid);
 vm_t* vm_lookup_by_uuid(const char *uuid);

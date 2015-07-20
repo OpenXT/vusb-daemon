@@ -61,12 +61,12 @@ device_bind_to_dom0(int busid, int devid)
 /* Add a device to the global list of devices */
 device_t*
 device_add(int  busid,
-	   int  devid,
-	   int  vendorid,
-	   int  deviceid,
-	   char *shortname,
-	   char *longname,
-	   char *sysname)
+           int  devid,
+           int  vendorid,
+           int  deviceid,
+           char *shortname,
+           char *longname,
+           char *sysname)
 {
   device_t *device;
 
@@ -90,7 +90,7 @@ device_add(int  busid,
 /* Remove a device from the global list of devices */
 int
 device_del(int  busid,
-	   int  devid)
+           int  devid)
 {
   struct list_head *pos;
   device_t *device;
@@ -120,8 +120,8 @@ device_del(int  busid,
    This uses the structure defined in classes.h, generated from usb.ids */
 char*
 device_type(unsigned char class,
-	    unsigned char subclass,
-	    unsigned char protocol)
+            unsigned char subclass,
+            unsigned char protocol)
 {
   const class_t *tmp = classes;
   int n = 0;
@@ -137,27 +137,27 @@ device_type(unsigned char class,
 
   /* Find the subclass or return the class */
   while (tmp->subs != NULL && tmp->subs[n].value != NULL &&
-	 tmp->subs[n].id != subclass)
+         tmp->subs[n].id != subclass)
     n++;
   if (tmp->subs == NULL || tmp->subs[n].value == NULL)
-    {
-      size = strlen(tmp->value) + 1;
-      res = malloc(size);
-      snprintf(res, size, "%s", tmp->value);
-      return res;
-    }
+  {
+    size = strlen(tmp->value) + 1;
+    res = malloc(size);
+    snprintf(res, size, "%s", tmp->value);
+    return res;
+  }
 
   /* Find the protocol or return the subclass */
   while (tmp->subs[n].prots != NULL && tmp->subs[n].prots[m].value != NULL &&
-	 tmp->subs[n].prots[m].id != protocol)
+         tmp->subs[n].prots[m].id != protocol)
     m++;
   if (tmp->subs[n].prots == NULL || tmp->subs[n].prots[m].value == NULL)
-    {
-      size = strlen(tmp->subs[n].value) + 1;
-      res = malloc(size);
-      snprintf(res, size, "%s", tmp->subs[n].value);
-      return res;
-    }
+  {
+    size = strlen(tmp->subs[n].value) + 1;
+    res = malloc(size);
+    snprintf(res, size, "%s", tmp->subs[n].value);
+    return res;
+  }
 
   /* Everything was found, returning the protocol */
   size = strlen(tmp->subs[n].prots[m].value) + 1;

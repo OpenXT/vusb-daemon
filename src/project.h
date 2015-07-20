@@ -114,6 +114,8 @@ typedef struct {
   char *longname;
   char *sysname;
   vm_t *vm;
+  int  keyboard;
+  int  mouse;
 } device_t;
 
 typedef struct dominfo
@@ -160,6 +162,8 @@ char *xs_dom0path;
 xcdbus_conn_t *g_xcbus;
 vm_t vms;
 device_t devices;
+
+struct udev *udev_handle;
 
 int   usbowls_xenstore_init(void);
 int   usbowls_xenstore_deinit(void);

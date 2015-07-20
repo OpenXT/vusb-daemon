@@ -80,6 +80,8 @@ device_add(int  busid,
   device->longname = longname;
   device->sysname = sysname;
   device->vm = NULL; /* The UI isn't happy if the device is assigned to dom0 */
+  device->keyboard = 0;
+  device->mouse = 0;
   list_add(&device->list, &devices.list);
 
   return device;

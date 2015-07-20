@@ -49,7 +49,6 @@ vusb_assign(int vendor, int product, int add)
 static int
 get_usbinfo(int bus, int dev, usbinfo_t *ui)
 {
-  struct udev *udev;
   struct udev_enumerate *enumerate;
   struct udev_list_entry *devices, *dev_list_entry;
   struct udev_device *udev_dev;
@@ -68,13 +67,7 @@ get_usbinfo(int bus, int dev, usbinfo_t *ui)
   ui->usb_bus = bus;
   ui->usb_device = dev;
 
-  /* udev scan */
-  udev = udev_new();
-  if (!udev) {
-    xd_log(LOG_ERR, "Can't create udev");
-    return -ENOMEM;
-  }
-  enumerate = udev_enumerate_new(udev);
+  enumerate = udev_enumerate_new(udev_handle);
   if (!enumerate) {
     xd_log(LOG_ERR, "Can't create enumeration");
     return -ENOMEM;
@@ -91,16 +84,14 @@ get_usbinfo(int bus, int dev, usbinfo_t *ui)
   udev_list_entry_foreach(dev_list_entry, devices) {
     const char *path;
     path = udev_list_entry_get_name(dev_list_entry);
-    udev_dev = udev_device_new_from_syspath(udev, path);
+    udev_dev = udev_device_new_from_syspath(udev_handle, path);
     sscanf(udev_device_get_sysattr_value(udev_dev, "idVendor"), "%x", &ui->usb_vendor);
     sscanf(udev_device_get_sysattr_value(udev_dev, "idProduct"), "%x", &ui->usb_product);
     udev_device_unref(udev_dev);
     udev_enumerate_unref(enumerate);
-    udev_unref(udev);
     return 0;
   }
   udev_enumerate_unref(enumerate);
-  udev_unref(udev);
   return -ENOENT;
 }
 

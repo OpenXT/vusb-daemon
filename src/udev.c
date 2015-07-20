@@ -23,23 +23,56 @@ static struct udev_monitor *udev_mon;
 int
 udev_init(void)
 {
-  struct udev *udev;
   int fd;
 
   /* Initialise udev monitor */
-  udev = udev_new();
-  if(udev == NULL)
+  udev_handle = udev_new();
+  if(udev_handle == NULL)
     {
-      printf("Can't create udev monitor");
+      printf("Can't create udev handle");
       return -1;
     }
 
-  udev_mon = udev_monitor_new_from_netlink(udev, "udev");
+  udev_mon = udev_monitor_new_from_netlink(udev_handle, "udev");
   udev_monitor_filter_add_match_subsystem_devtype(udev_mon, "usb", "usb_device");
   udev_monitor_enable_receiving(udev_mon);
   fd = udev_monitor_get_fd(udev_mon);
 
   return fd;
+}
+
+static void
+udev_find_more(struct udev_device *dev, device_t *device)
+{
+  struct udev_enumerate *enumerate;
+  struct udev_list_entry *udev_device_list, *udev_device_entry;
+  struct udev_device *udev_device;
+  const char *path;
+  const char *value;
+
+  enumerate = udev_enumerate_new(udev_handle);
+  udev_enumerate_add_match_parent(enumerate, dev);
+  udev_enumerate_add_match_property(enumerate, "ID_INPUT", "1");
+  udev_enumerate_scan_devices(enumerate);
+  udev_device_list = udev_enumerate_get_list_entry(enumerate);
+  udev_list_entry_foreach(udev_device_entry, udev_device_list) {
+    path = udev_list_entry_get_name(udev_device_entry);
+    udev_device = udev_device_new_from_syspath(udev_handle, path);
+    value = udev_device_get_property_value(udev_device, "ID_INPUT_KEY");
+    if (value != NULL && *value != '0') {
+      device->keyboard = 1;
+      continue;
+    }
+    value = udev_device_get_property_value(udev_device, "ID_INPUT_MOUSE");
+    if (value != NULL && *value != '0') {
+      device->mouse = 1;
+      continue;
+    }
+    udev_device_unref(udev_device);
+  }
+
+  /* Cleanup */
+  udev_enumerate_unref(enumerate);
 }
 
 /* Ignore device configurations and interfaces */
@@ -81,7 +114,36 @@ check_product(const char *s)
   return -1;
 }
 
-static int
+/* Let's do our best to make sure device are properly created */
+static void
+udev_settle(void)
+{
+  struct udev_queue *queue;
+  unsigned int i;
+
+  queue = udev_queue_new(udev_handle);
+  if (!queue) {
+    xd_log(LOG_WARN, "udev_queue_new failed");
+    /* We failed to get a queue, let's just sleep 0.1 seconds,
+       it's usually enough the get udev settled... */
+    usleep(100000);
+    return;
+  }
+
+  for (i = 0; i < 10; ++i) {
+    if (udev_queue_get_queue_is_empty(queue)) {
+      break;
+    }
+    xd_log(LOG_INFO, "udev queue is not empty, retrying for %f seconds...", 0.5 - i * 0.05);
+    /* Sleep for 0.05 seconds 10 times before giving up */
+    usleep(50000);
+  }
+
+  udev_queue_unref(queue);
+}
+
+
+static device_t*
 udev_maybe_add_device(struct udev_device *dev, int auto_assign)
 {
   const char *value;
@@ -96,51 +158,55 @@ udev_maybe_add_device(struct udev_device *dev, int auto_assign)
   int size;
   device_t *device;
 
+  /* Give udev some time to finish create the device and its children.
+     We could probably use udev_device_get_is_initialized() if it worked... */
+  udev_settle();
+
   /* Make sure the device is useful for us */
   value = udev_device_get_sysname(dev);
   if (value != NULL && check_sysname(value) != 0)
-    return -1;
+    return NULL;
 
   /* Check main device attributes.
      Skip any device that doesn't have them (shouldn't happen) */
   value = udev_device_get_sysattr_value(dev, "busnum");
   if (value == NULL)
-    return -1;
+    return NULL;
   else
     busnum = strtol(value, NULL, 10);
   value = udev_device_get_sysattr_value(dev, "devnum");
   if (value == NULL)
-    return -1;
+    return NULL;
   else
     devnum = strtol(value, NULL, 10);
   value = udev_device_get_sysattr_value(dev, "idVendor");
   if (value == NULL)
-    return -1;
+    return NULL;
   else
     vendorid = strtol(value, NULL, 16);
   value = udev_device_get_sysattr_value(dev, "idProduct");
   if (value == NULL)
-    return -1;
+    return NULL;
   else
     deviceid = strtol(value, NULL, 16);
   value = udev_device_get_sysattr_value(dev, "bDeviceClass");
   if (value == NULL)
-    return -1;
+    return NULL;
   else
     class = strtol(value, NULL, 16);
   value = udev_device_get_sysattr_value(dev, "bDeviceSubClass");
   if (value == NULL)
-    return -1;
+    return NULL;
   else
     subclass = strtol(value, NULL, 16);
   value = udev_device_get_sysattr_value(dev, "bDeviceProtocol");
   if (value == NULL)
-    return -1;
+    return NULL;
   else
     protocol = strtol(value, NULL, 16);
   value = udev_device_get_sysname(dev);
   if (value == NULL)
-    return -1;
+    return NULL;
   else {
     size = strlen(value) + 1;
     sysname = malloc(size);
@@ -149,7 +215,7 @@ udev_maybe_add_device(struct udev_device *dev, int auto_assign)
 
   /* This is a hub, we don't do hubs. */
   if (class == 0x09)
-    return -1;
+    return NULL;
 
   /* The device passes all the tests, we want it in the list */
 
@@ -205,10 +271,13 @@ udev_maybe_add_device(struct udev_device *dev, int auto_assign)
   /* Finally add the device */
   device = device_add(busnum, devnum, vendorid, deviceid, model, vendor, sysname);
 
+  /* Find out more about the device by looking at its children */
+  udev_find_more(dev, device);
+
   if (auto_assign > 0)
     policy_auto_assign(device);
 
-  return 0;
+  return device;
 }
 
 static void
@@ -217,12 +286,12 @@ udev_node_to_ids(const char *node, int *busid, int *devid)
   char *tmp;
 
   /* USB devnodes look like "/dev/bus/usb/XXX/YYY",
-   XXX being the busid and YYY being the devid.
-   If other formats are ever encountered,
+     XXX being the busid and YYY being the devid.
+     If other formats are ever encountered,
      we may consider storing the devnode in device_t */
 
   /* Instead of skipping 13 characters ("/dev/bus/usb/"),
-       just go to the first digit. */
+     just go to the first digit. */
   while (*node != '\0' && (*node > '9' || *node < '0'))
     node++;
 
@@ -268,19 +337,13 @@ int
 udev_fill_devices(void)
 {
   struct udev_enumerate *enumerate;
-  struct udev *udev;
   struct udev_list_entry *udev_device_list, *udev_device_entry;
   struct udev_device *udev_device;
   const char *path;
   uint16_t vendor = 0;
   uint16_t product = 0;
 
-  udev = udev_new();
-  if (!udev) {
-    xd_log(LOG_ERR, "Can't do udev");
-    return -1;
-  }
-  enumerate = udev_enumerate_new(udev);
+  enumerate = udev_enumerate_new(udev_handle);
   udev_enumerate_add_match_subsystem(enumerate, "usb");
   /* Sysname must start with a digit */
   udev_enumerate_add_match_sysname(enumerate, "[0-9]*");
@@ -288,14 +351,13 @@ udev_fill_devices(void)
   udev_device_list = udev_enumerate_get_list_entry(enumerate);
   udev_list_entry_foreach(udev_device_entry, udev_device_list) {
       path = udev_list_entry_get_name(udev_device_entry);
-      udev_device = udev_device_new_from_syspath(udev, path);
+      udev_device = udev_device_new_from_syspath(udev_handle, path);
       udev_maybe_add_device(udev_device, 0);
       udev_device_unref(udev_device);
   }
 
   /* Cleanup */
   udev_enumerate_unref(enumerate);
-  udev_unref(udev);
 }
 
 void
@@ -303,6 +365,7 @@ udev_event(void)
 {
   struct udev_device *dev;
   const char *action;
+  device_t *device;
 
   dev = udev_monitor_receive_device(udev_mon);
   if (dev) {
@@ -314,12 +377,18 @@ udev_event(void)
     printf("   Devtype: %s\n", udev_device_get_devtype(dev));
     printf("   Action: %s\n", action);
     if (!strcmp(action, "add")) {
-      printf("ADDING IT\n");
-      udev_maybe_add_device(dev, 1);
+      device = udev_maybe_add_device(dev, 1);
+      if (device != NULL) {
+	printf("   Mouse: %d\n", device->mouse);
+	printf("   Keyboard: %d\n", device->keyboard);
+	printf("ADDED\n");
+      } else {
+	printf("NOT ADDED\n");
+      }
     }
     if (!strcmp(action, "remove")) {
-      printf("REMOVING IT\n");
       udev_del_device(dev);
+      printf("REMOVED\n");
     }
     udev_device_unref(dev);
   }

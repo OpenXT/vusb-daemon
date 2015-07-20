@@ -95,9 +95,6 @@ main() {
   /* Populate the VM list */
   fill_vms();
 
-  /* Populate the USB device list */
-  udev_fill_devices();
-
   /* Initialize xenstore handle in usbowls */
   xs_handle = NULL;
   xs_dom0path = NULL;
@@ -118,6 +115,9 @@ main() {
     xd_log(LOG_ERR, "Unable to initialize the udev monitor");
     return -1;
   }
+
+  /* Populate the USB device list */
+  udev_fill_devices();
 
   /* Setup libusb */
   /* if (libusb_init(NULL) != 0) { */
@@ -150,8 +150,8 @@ main() {
   /* In the future, the while loop may break on critical error,
      so cleaning up here may be a good idea */
   ret = xenstore_deinit();
-
   /* libusb_exit(NULL); */
+  udev_unref(udev_handle);
 
   /* FIXME: free VMs and devices lists */
 

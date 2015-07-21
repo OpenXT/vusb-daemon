@@ -16,8 +16,27 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/**
+ * @file   device.c
+ * @author Jed Lejosne <lejosnej@ainfosec.com>
+ * @date   Tue Jul 21 10:45:37 2015
+ *
+ * @brief  Device list manipulation functions
+ *
+ * Functions to add/remove/lookup devices
+ */
+
+
 #include "project.h"
 
+/**
+ * Lookup a device in the list using its busid and devid
+ *
+ * @param busid The bus ID of the device
+ * @param devid The device ID of the device
+ *
+ * @return A pointer to the device if found, NULL otherwise
+ */
 device_t*
 device_lookup(int busid, int devid)
 {
@@ -34,31 +53,19 @@ device_lookup(int busid, int devid)
   return NULL;
 }
 
-int
-device_bind_to_dom0_by_sysname(const char *name)
-{
-  int fd;
-
-  fd = open("/sys/bus/usb/drivers_probe", O_WRONLY);
-  if (fd < 0)
-    return -1;
-  write(fd, name, strlen(name));
-  close(fd);
-
-  return 0;
-}
-
-int
-device_bind_to_dom0(int busid, int devid)
-{
-  device_t *device;
-
-  device = device_lookup(busid, devid);
-
-  return device_bind_to_dom0_by_sysname(device->sysname);
-}
-
-/* Add a device to the global list of devices */
+/**
+ * Add a new device to the global list of devices
+ *
+ * @param busid The device bus ID
+ * @param devid The device ID on the bus
+ * @param vendorid The device vendor ID
+ * @param deviceid The device device ID
+ * @param shortname The short description of the device (product name)
+ * @param longname The long description of the device (manufacturer)
+ * @param sysname The sysfs name of the device
+ *
+ * @return A pointer to the newly created device
+ */
 device_t*
 device_add(int  busid,
            int  devid,
@@ -87,7 +94,14 @@ device_add(int  busid,
   return device;
 }
 
-/* Remove a device from the global list of devices */
+/**
+ * Remove a device from the global list of devices
+ *
+ * @param busid The device bus ID
+ * @param devid The device ID on the bus
+ *
+ * @return 0 for success, -1 if the device wasn't found
+ */
 int
 device_del(int  busid,
            int  devid)
@@ -115,9 +129,20 @@ device_del(int  busid,
   return 0;
 }
 
-/* Build a string that represents the device type
-   by finding the deepest known class/subclass/protocol.
-   This uses the structure defined in classes.h, generated from usb.ids */
+/**
+ * Build a string that represents the device type
+ * by finding the deepest known class/subclass/protocol.
+ * This uses the structure defined in classes.h, generated from
+ * usb.ids.
+ * The caller is responsible for freeing the returned string.
+ *
+ * @param class The device class
+ * @param subclass The device subclass
+ * @param protocol The device protocol
+ *
+ * @return The deepest class string found (protocol || subclass || class)
+ *         or NULL if none
+ */
 char*
 device_type(unsigned char class,
             unsigned char subclass,
@@ -147,22 +172,22 @@ device_type(unsigned char class,
     return res;
   }
 
-  /* Find the protocol or return the subclass */
+  /* Find the protocol or return the "class - subclass" */
   while (tmp->subs[n].prots != NULL && tmp->subs[n].prots[m].value != NULL &&
          tmp->subs[n].prots[m].id != protocol)
     m++;
   if (tmp->subs[n].prots == NULL || tmp->subs[n].prots[m].value == NULL)
   {
-    size = strlen(tmp->subs[n].value) + 1;
+    size = strlen(tmp->value) + strlen(" - ") + strlen(tmp->subs[n].value) + 1;
     res = malloc(size);
-    snprintf(res, size, "%s", tmp->subs[n].value);
+    snprintf(res, size, "%s - %s", tmp->value, tmp->subs[n].value);
     return res;
   }
 
-  /* Everything was found, returning the protocol */
-  size = strlen(tmp->subs[n].prots[m].value) + 1;
+  /* Everything was found, returning the "class - protocol" */
+  size = strlen(tmp->value) + strlen(" - ") + strlen(tmp->subs[n].prots[m].value) + 1;
   res = malloc(size);
-  snprintf(res, size, "%s", tmp->subs[n].prots[m].value);
+  snprintf(res, size, "%s - %s", tmp->value, tmp->subs[n].prots[m].value);
 
   return res;
 }

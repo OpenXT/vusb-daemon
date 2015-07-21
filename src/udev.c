@@ -18,8 +18,16 @@
 
 #include "project.h"
 
+/**
+ * The global udev monitor handler. Only used in udev.c
+ */
 static struct udev_monitor *udev_mon;
 
+/**
+ * Initialize the udev bits.
+ *
+ * @return 0 on success, -1 if udev couldn't be initialized
+ */
 int
 udev_init(void)
 {
@@ -225,11 +233,11 @@ udev_maybe_add_device(struct udev_device *dev, int auto_assign)
     /* If it doesn't have a vendor, use udev to look it up in usb.ids. */
     value = udev_device_get_property_value(dev, "ID_VENDOR_FROM_DATABASE");
   if (value == NULL) {
-    /* usb.ids doesn't know about it either...
-       default to "Unknown vendor" */
-    size = strlen("Unknown vendor") + 1;
+    xd_log(LOG_ERR, "NO DATABASE VENDOR FOUND FOR %04x", vendorid);
+    /* usb.ids doesn't know about it either... Default to "Unknown" */
+    size = strlen("Unknown") + 1;
     vendor = malloc(size);
-    snprintf(vendor, size, "Unknown vendor");
+    snprintf(vendor, size, "Unknown");
   } else {
     /* Vendor was found in usb.ids */
     size = strlen(value) + 1;
@@ -245,22 +253,23 @@ udev_maybe_add_device(struct udev_device *dev, int auto_assign)
     value = udev_device_get_property_value(dev, "ID_MODEL_FROM_DATABASE");
   if (value == NULL) {
     /* usb.ids doesn't know about it either...
-       default to "<vendor> device - <type>" */
-    /* Get the type string for the device. 0 is not a "real" class */
-    char *type = NULL;
+       default to "<vendor> device (<type>)" */
+    char *type;
 
-    if (class != 0)
-      type = device_type(class, subclass, protocol);
+    xd_log(LOG_ERR, "NO DATABASE MODEL FOUND FOR %04x", deviceid);
+    /* Get the type string for the device. */
+    type = device_type(class, subclass, protocol);
     if (type != NULL) {
-      /* There's a type, let's do "<vendor> device - <type>" */
-      size = strlen(vendor) + strlen(" device - ") + strlen(type) + 1;
+      /* There's a type, let's do "<vendor> device (<type>)" */
+      size = strlen(vendor) + strlen(" device ()") + strlen(type) + 1;
       model = malloc(size);
-      snprintf(model, size, "%s device - %s", vendor, type);
+      snprintf(model, size, "%s device (%s)", vendor, type);
+      free(type);
     } else {
-      /* There's no type, let's just do "<vendor> device" */
-      size = strlen(vendor) + strlen(" device") + 1;
+      /* There's no type, let's just do "<vendor> device (<vendorid>:<deviceid>)" */
+      size = strlen(vendor) + strlen(" device (XXXX:XXXX)") + 1;
       model = malloc(size);
-      snprintf(model, size, "%s device", vendor);
+      snprintf(model, size, "%s device (%04x:%04x)", vendor, vendorid, deviceid);
     }
   } else {
     /* Model was found in usb.ids */
@@ -305,6 +314,13 @@ udev_node_to_ids(const char *node, int *busid, int *devid)
   *devid = strtol(tmp, NULL, 10);
 }
 
+/**
+ * Delete a device using its udev handle
+ *
+ * @param dev Udev handle of the device
+ *
+ * @return 0 on success, -1 on failure
+ */
 int
 udev_del_device(struct udev_device *dev)
 {
@@ -314,26 +330,18 @@ udev_del_device(struct udev_device *dev)
   int devnum;
 
   node = udev_device_get_devnode(dev);
+  if (node == NULL)
+    return -1;
   udev_node_to_ids(node, &busnum, &devnum);
 
-  device_del(busnum, devnum);
-
-  return 0;
+  return device_del(busnum, devnum);
 }
 
-int
-udev_bind_device_to_dom0(struct udev_device *dev)
-{
-  const char *name;
-
-  name = udev_device_get_devnode(dev);
-
-  return device_bind_to_dom0_by_sysname(name);
-}
-
-/* Enumerate all the udev USB devices that we care about,
-   build nice model and vendor strings and add them to the list */
-int
+/**
+ * Enumerate all the udev USB devices that we care about,
+ * build nice model and vendor strings and add them to the list
+ */
+void
 udev_fill_devices(void)
 {
   struct udev_enumerate *enumerate;
@@ -360,6 +368,11 @@ udev_fill_devices(void)
   udev_enumerate_unref(enumerate);
 }
 
+/**
+ * Udev monitor "callback". This function will add/delete devices
+ * according to a udev event. It should be called every time the udev
+ * monitor "wakes up".
+ */
 void
 udev_event(void)
 {

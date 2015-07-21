@@ -83,29 +83,32 @@
 #include "list.h"
 #include "classes.h"
 
-#define UUID_LENGTH 37 /* Includes the string terminator */
-#define DOM0_DOMID  0
-#define DOM0_UUID   "00000000-0000-0000-0000-000000000000"
-#define UIVM_UUID   "00000000-0000-0000-0000-000000000001"
-#define UIVM_PATH   "/vm/00000000_0000_0000_0000_000000000001"
+#define UUID_LENGTH 37 /**< Length of UUIDs, including the string terminator */
+#define DOM0_DOMID  0  /**< Dom0's domid... */
+#define DOM0_UUID   "00000000-0000-0000-0000-000000000000" /**< Dom0's UUID */
+#define UIVM_UUID   "00000000-0000-0000-0000-000000000001" /**< UIVM's UUID */
+#define UIVM_PATH   "/vm/00000000_0000_0000_0000_000000000001" /**< UIVM's xenstore path */
 
-#define XENMGR      "com.citrix.xenclient.xenmgr"
-#define XENMGR_OBJ  "/"
+#define XENMGR      "com.citrix.xenclient.xenmgr" /**< The dbus name of xenmgr*/
+#define XENMGR_OBJ  "/"                           /**< The main dbus object of xenmgr*/
 
-#define DEV_STATE_ERROR       -1 /* Cannot find device */
-#define DEV_STATE_UNUSED      0  /* Device not in use by any VM */
-#define DEV_STATE_ASSIGNED    1  /* Assigned to another VM which is off */
-#define DEV_STATE_IN_USE      2  /* Assigned to another VM which is running */
-#define DEV_STATE_BLOCKED     3  /* Blocked by policy for this VM */
-#define DEV_STATE_THIS        4  /* In use by this VM */
-#define DEV_STATE_THIS_ALWAYS 5  /* In use by this VM and flagged "always" */
-#define DEV_STATE_ALWAYS_ONLY 6  /* Flagged as "always" assigned to this VM, but not currently in use */
-#define DEV_STATE_PLATFORM    7  /* Special platform device, listed purely for information */
-#define DEV_STATE_HID_DOM0    8  /* HiD device assigned to dom0 */
-#define DEV_STATE_HID_ALWAYS  9  /* HiD device currently assigned to dom0, but always assigned to another VM */
-#define DEV_STATE_CD_DOM0     10 /* External CD drive assigned to dom0 */
-#define DEV_STATE_CD_ALWAYS   11 /* External CD drive currently assigned to dom0, but always assigned to another VM */
+#define DEV_STATE_ERROR       -1 /**< Cannot find device */
+#define DEV_STATE_UNUSED      0  /**< Device not in use by any VM */
+#define DEV_STATE_ASSIGNED    1  /**< Assigned to another VM which is off */
+#define DEV_STATE_IN_USE      2  /**< Assigned to another VM which is running */
+#define DEV_STATE_BLOCKED     3  /**< Blocked by policy for this VM */
+#define DEV_STATE_THIS        4  /**< In use by this VM */
+#define DEV_STATE_THIS_ALWAYS 5  /**< In use by this VM and flagged "always" */
+#define DEV_STATE_ALWAYS_ONLY 6  /**< Flagged as "always" assigned to this VM, but not currently in use */
+#define DEV_STATE_PLATFORM    7  /**< Special platform device, listed purely for information */
+#define DEV_STATE_HID_DOM0    8  /**< HiD device assigned to dom0 */
+#define DEV_STATE_HID_ALWAYS  9  /**< HiD device currently assigned to dom0, but always assigned to another VM */
+#define DEV_STATE_CD_DOM0     10 /**< External CD drive assigned to dom0 */
+#define DEV_STATE_CD_ALWAYS   11 /**< External CD drive currently assigned to dom0, but always assigned to another VM */
 
+/**
+ * The (stupid) logging macro
+ */
 #define xd_log(I, ...) { fprintf(stderr, ##__VA_ARGS__); fprintf(stderr, "\n"); }
 
 /**
@@ -186,18 +189,12 @@ static void makeBusDevPair(int devid, int *bus_num, int *dev_num)
   *dev_num = (devid & 0x7F) + 1;
 }
 
-/* char *xasprintf(const char *fmt, ...) __attribute__ ((format (printf, 1, 2))); */
-struct xs_handle *xs_handle;
-char *xs_dom0path;
+struct xs_handle *xs_handle; /**< The global xenstore handle, initialized by xenstore_init() */
+xcdbus_conn_t *g_xcbus;      /**< The global dbus (libxcdbus) handle, initialized by rpc_init() */
+vm_t vms;                    /**< The global list of VMs, handled by vm.c */
+device_t devices;            /**< The global list of devices, handled by device.c */
+struct udev *udev_handle;    /**< The global udev handle, initialized by udev_init() */
 
-xcdbus_conn_t *g_xcbus;
-vm_t vms;
-device_t devices;
-
-struct udev *udev_handle;
-
-int   usbowls_xenstore_init(void);
-int   usbowls_xenstore_deinit(void);
 int   usbowls_plug_device(int domid, int bus, int device);
 int   usbowls_unplug_device(int domid, int bus, int device);
 
@@ -205,21 +202,18 @@ void  rpc_init(void);
 
 int   udev_init(void);
 void  udev_event(void);
-int   udev_fill_devices(void);
-int   udev_bind_device_to_dom0(struct udev_device *dev);
+void  udev_fill_devices(void);
 
-device_t*   device_lookup(int busid, int devid);
-device_t*   device_add(int busid, int devid, int vendorid, int deviceid,
-                       char *shortname, char *longname, char *sysname);
-int         device_del(int  busid, int  devid);
-int         device_bind_to_dom0(int busid, int devid);
-int         device_bind_to_dom0_by_sysname(const char *name);
-char*       device_type(unsigned char class, unsigned char subclass,
-                        unsigned char protocol);
+device_t* device_lookup(int busid, int devid);
+device_t* device_add(int busid, int devid, int vendorid, int deviceid,
+                     char *shortname, char *longname, char *sysname);
+int       device_del(int  busid, int  devid);
+char*     device_type(unsigned char class, unsigned char subclass,
+                      unsigned char protocol);
 
 vm_t* vm_lookup(const int domid);
 vm_t* vm_lookup_by_uuid(const char *uuid);
-int   vm_add(const int domid, const char *uuid);
+vm_t* vm_add(const int domid, const char *uuid);
 int   vm_del(const int domid);
 
 int   xenstore_create_usb(dominfo_t *domp, usbinfo_t *usbp);
@@ -229,7 +223,7 @@ int   xenstore_get_dominfo(int domid, dominfo_t *di);
 void  xenstore_get_xb_states(dominfo_t *domp, usbinfo_t *usbp, int *frontst, int *backst);
 void  xenstore_list_domain_devs(dominfo_t *domp);
 int   xenstore_init(void);
-int   xenstore_deinit(void);
+void  xenstore_deinit(void);
 
 int   policy_init(void);
 int   policy_auto_assign(device_t *device);

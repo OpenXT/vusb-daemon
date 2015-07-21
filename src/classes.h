@@ -37,10 +37,11 @@ typedef struct {
 } class_t;
 
 
-/* Generated using https://github.com/jean-edouard/binterface-parser */
-
+/**
+ * Generated using https://github.com/jean-edouard/binterface-parser,
+ * then modified to remove meaningless entries like "Vendor Specific"
+ */
 static const class_t classes[] = {
-  { 0x00, "(Defined at Interface level)", NULL },
   { 0x01, "Audio", (subclass_t []) {
       { 0x01, "Control Device", NULL },
       { 0x02, "Streaming", NULL },
@@ -49,7 +50,6 @@ static const class_t classes[] = {
   { 0x02, "Communications", (subclass_t []) {
       { 0x01, "Direct Line", NULL },
       { 0x02, "Abstract (modem)", (protocol_t []) {
-	  { 0x00, "None" },
 	  { 0x01, "AT-commands (v.25ter)" },
 	  { 0x02, "AT-commands (PCCA101)" },
 	  { 0x03, "AT-commands (PCCA101 + wakeup)" },
@@ -74,12 +74,10 @@ static const class_t classes[] = {
       {0,NULL,NULL} } },
   { 0x03, "Human Interface Device", (subclass_t []) {
       { 0x00, "No Subclass", (protocol_t []) {
-	  { 0x00, "None" },
 	  { 0x01, "Keyboard" },
 	  { 0x02, "Mouse" },
 	  {0,NULL} } },
       { 0x01, "Boot Interface Subclass", (protocol_t []) {
-	  { 0x00, "None" },
 	  { 0x01, "Keyboard" },
 	  { 0x02, "Mouse" },
 	  {0,NULL} } },
@@ -92,11 +90,9 @@ static const class_t classes[] = {
       {0,NULL,NULL} } },
   { 0x07, "Printer", (subclass_t []) {
       { 0x01, "Printer", (protocol_t []) {
-	  { 0x00, "Reserved/Undefined" },
 	  { 0x01, "Unidirectional" },
 	  { 0x02, "Bidirectional" },
 	  { 0x03, "IEEE 1284.4 compatible bidirectional" },
-	  { 0xff, "Vendor Specific" },
 	  {0,NULL} } },
       {0,NULL,NULL} } },
   { 0x08, "Mass Storage", (subclass_t []) {
@@ -140,13 +136,11 @@ static const class_t classes[] = {
 	  { 0x93, "CAPI 2.0" },
 	  { 0xfd, "Host Based Driver" },
 	  { 0xfe, "CDC PUF" },
-	  { 0xff, "Vendor specific" },
 	  {0,NULL} } },
       {0,NULL,NULL} } },
   { 0x0b, "Chip/SmartCard", NULL },
   { 0x0d, "Content Security", NULL },
   { 0x0e, "Video", (subclass_t []) {
-      { 0x00, "Undefined", NULL },
       { 0x01, "Video Control", NULL },
       { 0x02, "Video Streaming", NULL },
       { 0x03, "Video Interface Collection", NULL },
@@ -191,11 +185,6 @@ static const class_t classes[] = {
       { 0x03, "Test and Measurement", (protocol_t []) {
 	  { 0x01, "TMC" },
 	  { 0x02, "USB488" },
-	  {0,NULL} } },
-      {0,NULL,NULL} } },
-  { 0xff, "Vendor Specific Class", (subclass_t []) {
-      { 0xff, "Vendor Specific Subclass", (protocol_t []) {
-	  { 0xff, "Vendor Specific Protocol" },
 	  {0,NULL} } },
       {0,NULL,NULL} } },
   {0,NULL,NULL}

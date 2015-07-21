@@ -18,22 +18,6 @@
 
 #include "project.h"
 
-#if 0
-static int
-disable_autoprobe(void)
-{
-  int fd;
-
-  fd = open("/sys/bus/usb/drivers_autoprobe", O_WRONLY);
-  if (fd < 0)
-    return -1;
-  write(fd, "0", 1);
-  close(fd);
-
-  return 0;
-}
-#endif
-
 static void fill_vms()
 {
   GPtrArray *paths;
@@ -97,7 +81,6 @@ main() {
 
   /* Initialize xenstore handle in usbowls */
   xs_handle = NULL;
-  xs_dom0path = NULL;
   ret = xenstore_init();
   if (ret != 0)
     return ret;
@@ -149,7 +132,7 @@ main() {
 
   /* In the future, the while loop may break on critical error,
      so cleaning up here may be a good idea */
-  ret = xenstore_deinit();
+  xenstore_deinit();
   /* libusb_exit(NULL); */
   udev_unref(udev_handle);
 

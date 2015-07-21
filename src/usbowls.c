@@ -17,6 +17,18 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/**
+ * @file   usbowls.c
+ * @author Jed Lejosne <lejosnej@ainfosec.com>
+ * @date   Tue Jul 21 13:54:18 2015
+ *
+ * @brief  Function to assign/unassign devices to VMs
+ *
+ * All the code used to trigger the actual device passthrough events
+ * lives here. Functions in this file talk to usbback and xenstore to
+ * make stuff happen.
+ */
+
 #include "project.h"
 
 #define VUSB_ADD_DEV            "/sys/bus/usb/drivers/vusb/new_id"
@@ -102,6 +114,17 @@ dump_dev(usbinfo_t *ui)
          ui->usb_vendor, ui->usb_product, ui->usb_virtid);
 }
 
+/**
+ * "Plug" a device to a VM.
+ * xenstore_create_usb() will be called to "attach" the device, then
+ * vusb_assign() will "assign" it.
+ *
+ * @param domid The domid of the VM to plug the device to
+ * @param bus The bus ID of the device
+ * @param device The ID of the device on the bus
+ *
+ * @return 0 for success, 1 for failure
+ */
 int
 usbowls_plug_device(int domid, int bus, int device)
 {
@@ -130,7 +153,7 @@ usbowls_plug_device(int domid, int bus, int device)
     return 1;
   }
 
-  /* FIXME: wait for the backend to be connected (xs_watch) */
+  /* IMPORTANT FIXME: wait for the backend to be connected (xs_watch) */
 
   ret = vusb_assign(ui.usb_vendor, ui.usb_product, 1);
   if (ret != 0) {
@@ -142,6 +165,17 @@ usbowls_plug_device(int domid, int bus, int device)
   return 0;
 }
 
+/**
+ * "Unplug" a device from a VM.
+ * vusb_unassign() will "unassign" it, then
+ * xenstore_create_usb() will be called to "detach" the device.
+ *
+ * @param domid The domid of the VM to unplug the device from
+ * @param bus The bus ID of the device
+ * @param device The ID of the device on the bus
+ *
+ * @return 0 for success, 1 for failure
+ */
 int
 usbowls_unplug_device(int domid, int bus, int device)
 {

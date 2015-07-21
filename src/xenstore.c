@@ -18,6 +18,11 @@
 
 #include "project.h"
 
+/**
+ * The xenstore dom0 path, set by xenstore_init()
+ */
+char *xs_dom0path = NULL;
+
 static void*
 xmalloc(size_t size)
 {
@@ -90,6 +95,15 @@ xenstore_add_dir(xs_transaction_t xt, char *path, int d0, int p0, int d1, int p1
   return (0);
 }
 
+/**
+ * Read the xenstore node of a specific VM (/local/domain/<domid>/<path>)
+ *
+ * @param domid The domid of the VM
+ * @param format The printf format of the subpath to read, followed by
+ *        the format parameters
+ *
+ * @return The value of the key if found, NULL otherwise
+ */
 char*
 xenstore_dom_read(unsigned int domid, const char *format, ...)
 {
@@ -119,6 +133,14 @@ xenstore_dom_read(unsigned int domid, const char *format, ...)
   return ret;
 }
 
+/**
+ * Fill the domain information for a given VM
+ *
+ * @param domid The domid of the VM
+ * @param di The domain information to fill
+ *
+ * @return 0 on success, -ENOENT on failure
+ */
 int
 xenstore_get_dominfo(int domid, dominfo_t *di)
 {
@@ -141,7 +163,7 @@ xenstore_get_keyval(char *path, char *key)
   return xs_read(xs_handle, XBT_NULL, tmppath, NULL);
 }
 
-/*
+/**
  * Write a single value into Xenstore.
  */
 static int
@@ -237,7 +259,7 @@ xenstore_list_domain_devs(dominfo_t *domp)
   fflush(stdout);
 }
 
-/*
+/**
  * Populate Xenstore with the information about a usb device for this domain
  */
 int
@@ -324,7 +346,7 @@ xenstore_create_usb(dominfo_t *domp, usbinfo_t *usbp)
   return (-1);
 }
 
-/*
+/**
  * Remove information about a usb device for this domain from Xenstore
  */
 int
@@ -364,6 +386,11 @@ xenstore_destroy_usb(dominfo_t *domp, usbinfo_t *usbp)
   return (0);
 }
 
+/**
+ * Initialize the xenstore bits
+ *
+ * @return 0 on success, 1 on failure
+ */
 int
 xenstore_init(void)
 {
@@ -388,11 +415,13 @@ xenstore_init(void)
   return 0;
 }
 
-int
+/**
+ * De-initialize xenstore, to be called at the end of the program,
+ * should it ever happen...
+ */
+void
 xenstore_deinit(void)
 {
   xs_daemon_close(xs_handle);
   xs_handle = NULL;
-
-  return 0;
 }

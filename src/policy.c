@@ -16,20 +16,45 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/**
+ * @file   policy.c
+ * @author Jed Lejosne <lejosnej@ainfosec.com>
+ * @date   Tue Jul 21 12:35:02 2015
+ *
+ * @brief  The USB policy management
+ *
+ * Functions used to configure the policy for USB assignations
+ */
+
+
 #include "project.h"
 
 #define STICKY_FILE_PATH "/config/etc/USB_always.conf"
 
+/**
+ * @brief Sticky rule
+ *
+ * This represents a "sticky rule", which tells which specific device
+ * always gets assigned to which specific VM.
+ */
 typedef struct {
-  struct list_head list;
-  int vendorid;
-  int deviceid;
-  char *serial;
-  char *uuid;
+  struct list_head list;        /**< The kernel-list-like list item */
+  int vendorid;                 /**< The device vendor ID */
+  int deviceid;                 /**< The device device ID */
+  char *serial;                 /**< The device serial (shortname) */
+  char *uuid;                   /**< The uuid of the VM  */
 } sticky_t;
 
+/**
+ * If this stays true, it means devices are automatically assigned to
+ * the VM that currently has the focus (unless there's a sticky rule
+ * for assigning it to another running VM)
+ */
 static bool auto_assign_to_focused_vm = true;
 
+/**
+ * The global list of sticky rules, that's only used by policy.c
+ */
 sticky_t stickys;
 
 static int
@@ -202,6 +227,14 @@ policy_read_stickys_from_file(void)
   return ret;
 }
 
+/**
+ * Create a new sticky rule using a device and its currently assigned
+ * VM, then dump the rules to the persistant config file.
+ *
+ * @param dev The device single ID
+ *
+ * @return 0 if the device was found and assigned to a VM, -1 otherwise
+ */
 int
 policy_set_sticky(int dev)
 {
@@ -214,19 +247,34 @@ policy_set_sticky(int dev)
     return -1;
   sticky_add(device->vendorid, device->deviceid, device->shortname, device->vm->uuid);
   policy_dump_stickys_to_file();
+
+  return 0;
 }
 
+/**
+ * Delete a sticky rule matching a device. On success, dump the rules
+ * to the persistant config file
+ *
+ * @param dev The device single ID
+ *
+ * @return 0 if the device was found, -1 otherwise
+ */
 int
 policy_unset_sticky(int dev)
 {
   int busid, devid;
   device_t *device;
+  int ret;
 
   makeBusDevPair(dev, &busid, &devid);
   device = device_lookup(busid, devid);
-  if (device == NULL || device->vm == NULL)
+  if (device == NULL)
     return -1;
-  return sticky_del(device->vendorid, device->deviceid, device->shortname);
+  ret = sticky_del(device->vendorid, device->deviceid, device->shortname);
+  if (ret == 0)
+    policy_dump_stickys_to_file();
+
+  return ret;
 }
 
 static vm_t*
@@ -239,6 +287,15 @@ vm_focused(void)
   return vm_lookup(domid);
 }
 
+/**
+ * This function should be called when a new device is plugged.
+ * It will assign the device to a VM if a sticky rule says so.
+ *
+ * @param device A pointer to the device that was just plugged
+ *
+ * @return -1 if no sticky rules matches the device, the result of
+ *         usbowls_plug_device otherwise.
+ */
 int
 policy_auto_assign(device_t *device)
 {
@@ -267,6 +324,12 @@ policy_auto_assign(device_t *device)
   return -1;
 }
 
+/**
+ * Initialize the policy bits
+ *
+ * @return 0 if everything went fine, -1 if there was an error reading
+ * an eventual persistant config file.
+ */
 int
 policy_init(void)
 {

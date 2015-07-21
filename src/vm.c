@@ -16,8 +16,25 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/**
+ * @file   vm.c
+ * @author Jed Lejosne <lejosnej@ainfosec.com>
+ * @date   Tue Jul 21 10:45:50 2015
+ *
+ * @brief  VM list manipulation function
+ *
+ * Functions to add/remove/lookup VMs
+ */
+
 #include "project.h"
 
+/**
+ * Lookup a VM in the list using its domid
+ *
+ * @param domid The domid of the VM to find
+ *
+ * @return A pointer to the VM if found, NULL otherwise
+ */
 vm_t*
 vm_lookup(const int domid)
 {
@@ -34,6 +51,13 @@ vm_lookup(const int domid)
   return NULL;
 }
 
+/**
+ * Lookup a VM in the list using its uuid
+ *
+ * @param uuid The uuid of the VM to find
+ *
+ * @return A pointer to the VM if found, NULL otherwise
+ */
 vm_t*
 vm_lookup_by_uuid(const char *uuid)
 {
@@ -68,7 +92,16 @@ uuid_copy_and_sanitize(const char *uuid)
   return res;
 }
 
-int
+/**
+ * Adds a new VM to the list, or update its domid.
+ *
+ * @param domid The VM domid
+ * @param uuid  The VM uuid
+ *
+ * @return A pointer to the new/updated VM on success,
+ *         NULL if there's already a VM with this domid
+ */
+vm_t*
 vm_add(const int domid, const char *uuid)
 {
   struct list_head *pos;
@@ -83,12 +116,12 @@ vm_add(const int domid, const char *uuid)
     vm = list_entry(pos, vm_t, list);
     if (vm->domid == domid) {
       xd_log(LOG_ERR, "new VM already registered: %d", domid);
-      return -1;
+      return NULL;
     }
     if (!strcmp(vm->uuid, new_uuid)) {
       xd_log(LOG_WARN, "VM already registered: %s. Changing domid", new_uuid);
       vm->domid = domid;
-      return 0;
+      return vm;
     }
   }
 
@@ -98,9 +131,16 @@ vm_add(const int domid, const char *uuid)
   vm->uuid = new_uuid;
   list_add(&vm->list, &vms.list);
 
-  return 0;
+  return vm;
 }
 
+/**
+ * Remove a VM from the list
+ *
+ * @param domid The domid of the VM to remove
+ *
+ * @return 0 on success, -1 if the VM was not found
+ */
 int
 vm_del(const int domid)
 {

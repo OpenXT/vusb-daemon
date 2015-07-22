@@ -197,6 +197,7 @@ struct udev *udev_handle;    /**< The global udev handle, initialized by udev_in
 
 int   usbowls_plug_device(int domid, int bus, int device);
 int   usbowls_unplug_device(int domid, int bus, int device);
+int   usbowls_build_usbinfo(int bus, int dev, int vendor, int product, usbinfo_t *ui);
 
 void  rpc_init(void);
 
@@ -218,6 +219,8 @@ int   vm_del(const int domid);
 
 int   xenstore_create_usb(dominfo_t *domp, usbinfo_t *usbp);
 int   xenstore_destroy_usb(dominfo_t *domp, usbinfo_t *usbp);
+int   xenstore_wait_for_online(dominfo_t *di, usbinfo_t *ui);
+int   xenstore_wait_for_offline(dominfo_t *di, usbinfo_t *ui);
 char* xenstore_dom_read (unsigned int domid, const char *format, ...);
 int   xenstore_get_dominfo(int domid, dominfo_t *di);
 void  xenstore_get_xb_states(dominfo_t *domp, usbinfo_t *usbp, int *frontst, int *backst);

@@ -60,13 +60,6 @@ xasprintf(const char *fmt, ...)
   return (s);
 }
 
-static void
-xenstore_remove(xs_transaction_t xt, char *path)
-{
-  xd_log(LOG_VERBOSE_DEBUG, "XenStore removing %s", path);
-  xs_rm(xs_handle, xt, path);
-}
-
 /*
  * Create a new directory in Xenstore
  */
@@ -88,7 +81,7 @@ xenstore_add_dir(xs_transaction_t xt, char *path, int d0, int p0, int d1, int p1
   if (xs_set_permissions(xs_handle, xt, path, perms, 2) == false) {
     xd_log(LOG_ERR, "XenStore error setting permissions on %s",
            path);
-    xenstore_remove(xt, path);
+    xs_rm(xs_handle, xt, path);
     return (-1);
   }
 
@@ -223,16 +216,6 @@ xenstore_get_xb_states(dominfo_t *domp, usbinfo_t *usbp, int *frontst, int *back
   free(bepath);
 }
 
-static int
-test_offline(dominfo_t *domp, usbinfo_t *usbp)
-{
-  int f, b;
-  xenstore_get_xb_states(domp, usbp, &f, &b);
-  printf("%d %d\n", f, b);
-  return (f == XB_UNKNOWN || f == XB_CLOSED) &&
-    (b == XB_UNKNOWN || b == XB_CLOSED);
-}
-
 void
 xenstore_list_domain_devs(dominfo_t *domp)
 {
@@ -346,6 +329,105 @@ xenstore_create_usb(dominfo_t *domp, usbinfo_t *usbp)
   return (-1);
 }
 
+static int
+wait_for_states(char *bepath, char *fepath, enum XenBusStates a, enum XenBusStates b)
+{
+  char *bstate, *fstate;
+  int bstatelen, fstatelen;
+  char *buf;
+  int bwatch, fwatch;
+  int fd;
+  struct timeval tv = { .tv_sec = 5, .tv_usec = 0 };
+  int ret = -1;
+
+  bstatelen = strlen(bepath) + strlen("/state") + 1;
+  fstatelen = strlen(fepath) + strlen("/state") + 1;
+  bstate = malloc(bstatelen);
+  fstate = malloc(fstatelen);
+  snprintf(bstate, bstatelen, "%s/state", bepath);
+  snprintf(fstate, fstatelen, "%s/state", fepath);
+  bwatch = xs_watch(xs_handle, bstate, bstate);
+  fwatch = xs_watch(xs_handle, fstate, fstate);
+  fd = xs_fileno(xs_handle);
+  while (tv.tv_sec != 0 || tv.tv_usec != 0)
+  {
+    int b, f;
+    fd_set set;
+
+    FD_ZERO(&set);
+    FD_SET(fd, &set);
+    /* FIXME: This seems to never block for some reason... */
+    if (select(fd + 1, &set, NULL, NULL, &tv) < 0)
+      break;
+    if (!FD_ISSET(fd, &set))
+      continue;
+    buf = xs_read(xs_handle, XBT_NULL, bstate, NULL);
+    b = *buf - '0';
+    buf = xs_read(xs_handle, XBT_NULL, fstate, NULL);
+    f = *buf - '0';
+    if ((f == a || f == b) &&
+        (b == a || b == b))
+    {
+      ret = 0;
+      break;
+    }
+  }
+  xs_unwatch(xs_handle, bstate, bstate);
+  xs_unwatch(xs_handle, fstate, fstate);
+  free(bstate);
+  free(fstate);
+
+  return ret;
+}
+
+/**
+ * Wait until both the frontend and the backend are in a connected
+ * state. Fail after 5 seconds.
+ *
+ * @param di Domain info
+ * @param ui USB device info
+ *
+ * @return 0 on success, -1 on failure
+ */
+int
+xenstore_wait_for_online(dominfo_t *di, usbinfo_t *ui)
+{
+  char *bepath, *fepath;
+  int ret;
+
+  bepath = xenstore_dev_bepath(di, "vusb", ui->usb_virtid);
+  fepath = xenstore_dev_fepath(di, "vusb", ui->usb_virtid);
+  ret = wait_for_states(bepath, fepath, XB_CONNECTED, XB_CONNECTED);
+  free(bepath);
+  free(fepath);
+
+  return ret;
+}
+
+/**
+ * Wait until both the frontend and the backend are in a closed
+ * state. Fail after 5 seconds.
+ *
+ * @param di Domain info
+ * @param ui USB device info
+ *
+ * @return 0 on success, -1 on failure
+ */
+int
+xenstore_wait_for_offline(dominfo_t *di, usbinfo_t *ui)
+{
+  char *bepath, *fepath;
+  int ret;
+
+  bepath = xenstore_dev_bepath(di, "vusb", ui->usb_virtid);
+  fepath = xenstore_dev_fepath(di, "vusb", ui->usb_virtid);
+  ret = wait_for_states(bepath, fepath, XB_UNKNOWN, XB_CLOSED);
+  free(bepath);
+  free(fepath);
+
+  return ret;
+}
+
 /**
  * Remove information about a usb device for this domain from Xenstore
  */
@@ -356,6 +438,7 @@ xenstore_destroy_usb(dominfo_t *domp, usbinfo_t *usbp)
   char *bepath;
   char *fepath;
   int i;
+  int ret;
 
   xd_log(LOG_INFO, "Deleting VUSB node %d for %d.%d",
          usbp->usb_virtid, usbp->usb_bus, usbp->usb_device);
@@ -369,21 +452,23 @@ xenstore_destroy_usb(dominfo_t *domp, usbinfo_t *usbp)
   snprintf(value, sizeof (value), "%d", XB_CLOSING);
   xenstore_set_keyval(XBT_NULL, bepath, "state", value);
 
-  /* TODO: NUKE SLEEPS!! */
-  for (i = 0; i < 30; ++i) {
-    usleep(100000);
-    if (test_offline(domp, usbp)) {
-      xs_rm(xs_handle, XBT_NULL, fepath);
-      xs_rm(xs_handle, XBT_NULL, bepath);
-      break;
-    }
+  if (xenstore_wait_for_offline(domp, usbp) == 0)
+  {
+    xs_rm(xs_handle, XBT_NULL, bepath);
+    xs_rm(xs_handle, XBT_NULL, fepath);
+    ret = 0;
+  } else {
+    xd_log(LOG_ERR, "Failed to bring the USB device offline");
+    /* FIXME: Should we keep the nodes around? Check if the VM is asleep? */
+    xd_log(LOG_ERR, "Cleaning xenstore nodes anyway");
+    xs_rm(xs_handle, XBT_NULL, bepath);
+    xs_rm(xs_handle, XBT_NULL, fepath);
+    ret = -1;
   }
-
 
   free(bepath);
   free(fepath);
-
-  return (0);
+  return ret;
 }
 
 /**

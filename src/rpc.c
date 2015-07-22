@@ -28,7 +28,6 @@ static DBusGConnection *g_glib_dbus_conn = NULL;
 /* CTXUSB_DAEMON dbus object implementation */
 #include "rpcgen/ctxusb_daemon_server_obj.h"
 
-
 /**
  * @brief Initialize the DBus RPC bits
  *
@@ -272,7 +271,8 @@ gboolean ctxusb_daemon_unassign_device(CtxusbDaemonObject *this,
   struct list_head *pos;
   device_t *device;
   int busid, devid;
-  int ret;
+  int res;
+  gboolean ret = TRUE;
 
   makeBusDevPair(IN_dev_id, &busid, &devid);
   list_for_each(pos, &devices.list) {
@@ -296,18 +296,18 @@ gboolean ctxusb_daemon_unassign_device(CtxusbDaemonObject *this,
                 "Device %d is not currently assigned to a VM, can't unassign", IN_dev_id);
     return FALSE;
   }
-  ret = usbowls_unplug_device(device->vm->domid, device->busid, device->devid);
-  if (ret != 0) {
+  res = usbowls_unplug_device(device->vm->domid, device->busid, device->devid);
+  if (res != 0) {
     g_set_error(error,
                 DBUS_GERROR,
                 DBUS_GERROR_FAILED,
-                "Failed to unplug device %d-%d from VM %d", device->busid, device->devid, device->vm->domid);
-    return FALSE;
+                "Failed to gracefully unplug device %d-%d from VM %d", device->busid, device->devid, device->vm->domid);
+    ret = FALSE;
   }
 
   device->vm = NULL;
 
-  return TRUE;
+  return ret;
 }
 
 gboolean ctxusb_daemon_set_sticky(CtxusbDaemonObject *this,

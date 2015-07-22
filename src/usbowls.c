@@ -58,15 +58,19 @@ vusb_assign(int vendor, int product, int add)
   return (ret);
 }
 
-static int
-get_usbinfo(int bus, int dev, usbinfo_t *ui)
+/**
+ * Build a usbinfo_t from a udev device handle
+ *
+ * @param udev_dev Udev device handle
+ * @param bus Bus ID
+ * @param dev Device ID on the bus
+ * @param ui The structure to fill (must be already allocated)
+ *
+ * @return 0 on success
+ */
+int
+usbowls_build_usbinfo(int bus, int dev, int vendor, int product, usbinfo_t *ui)
 {
-  struct udev_enumerate *enumerate;
-  struct udev_list_entry *devices, *dev_list_entry;
-  struct udev_device *udev_dev;
-  char bus_str[16], dev_str[16];
-  int found = 0;
-
   memset(ui, 0, sizeof(usbinfo_t));
 
   /* construct xenstore dev id */
@@ -78,6 +82,21 @@ get_usbinfo(int bus, int dev, usbinfo_t *ui)
   ui->usb_virtid = bus << 12 | (dev & 0xFFF);
   ui->usb_bus = bus;
   ui->usb_device = dev;
+
+  ui->usb_vendor = vendor;
+  ui->usb_product = product;
+
+  return 0;
+}
+
+static int
+get_usbinfo(int bus, int dev, usbinfo_t *ui)
+{
+  struct udev_enumerate *enumerate;
+  struct udev_list_entry *devices, *dev_list_entry;
+  struct udev_device *udev_dev;
+  char bus_str[16], dev_str[16];
+  int vendor, product;
 
   enumerate = udev_enumerate_new(udev_handle);
   if (!enumerate) {
@@ -95,13 +114,14 @@ get_usbinfo(int bus, int dev, usbinfo_t *ui)
   devices = udev_enumerate_get_list_entry(enumerate);
   udev_list_entry_foreach(dev_list_entry, devices) {
     const char *path;
+
     path = udev_list_entry_get_name(dev_list_entry);
     udev_dev = udev_device_new_from_syspath(udev_handle, path);
-    sscanf(udev_device_get_sysattr_value(udev_dev, "idVendor"), "%x", &ui->usb_vendor);
-    sscanf(udev_device_get_sysattr_value(udev_dev, "idProduct"), "%x", &ui->usb_product);
+    sscanf(udev_device_get_sysattr_value(udev_dev, "idVendor"), "%x", &vendor);
+    sscanf(udev_device_get_sysattr_value(udev_dev, "idProduct"), "%x", &product);
     udev_device_unref(udev_dev);
     udev_enumerate_unref(enumerate);
-    return 0;
+    return usbowls_build_usbinfo(bus, dev, vendor, product, ui);
   }
   udev_enumerate_unref(enumerate);
   return -ENOENT;
@@ -144,7 +164,7 @@ usbowls_plug_device(int domid, int bus, int device)
   }
 
   /* FIXME: nicely unbind dom0 drivers on interfaces?
-   * USB supports hot unplug doesn't it? :)
+   * Or not, USB supports hot unplug doesn't it? :)
    */
 
   ret = xenstore_create_usb(&di, &ui);
@@ -153,7 +173,8 @@ usbowls_plug_device(int domid, int bus, int device)
     return 1;
   }
 
-  /* IMPORTANT FIXME: wait for the backend to be connected (xs_watch) */
+  if (xenstore_wait_for_online(&di, &ui) != 0)
+    xd_log(LOG_ERR, "The frontend or the backend didn't go online, continue anyway");
 
   ret = vusb_assign(ui.usb_vendor, ui.usb_product, 1);
   if (ret != 0) {

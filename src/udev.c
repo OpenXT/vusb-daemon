@@ -233,7 +233,6 @@ udev_maybe_add_device(struct udev_device *dev, int auto_assign)
     /* If it doesn't have a vendor, use udev to look it up in usb.ids. */
     value = udev_device_get_property_value(dev, "ID_VENDOR_FROM_DATABASE");
   if (value == NULL) {
-    xd_log(LOG_ERR, "NO DATABASE VENDOR FOUND FOR %04x", vendorid);
     /* usb.ids doesn't know about it either... Default to "Unknown" */
     size = strlen("Unknown") + 1;
     vendor = malloc(size);
@@ -256,7 +255,6 @@ udev_maybe_add_device(struct udev_device *dev, int auto_assign)
        default to "<vendor> device (<type>)" */
     char *type;
 
-    xd_log(LOG_ERR, "NO DATABASE MODEL FOUND FOR %04x", deviceid);
     /* Get the type string for the device. */
     type = device_type(class, subclass, protocol);
     if (type != NULL) {
@@ -315,7 +313,7 @@ udev_node_to_ids(const char *node, int *busid, int *devid)
 }
 
 /**
- * Delete a device using its udev handle
+ * Cleanup xenstore and delete a device after a udev removal event.
  *
  * @param dev Udev handle of the device
  *
@@ -328,13 +326,29 @@ udev_del_device(struct udev_device *dev)
   const char *value;
   int busnum;
   int devnum;
+  usbinfo_t ui;
+  dominfo_t di;
+  device_t *device;
+  int ret;
 
+  /* Find the bus and device IDs */
   node = udev_device_get_devnode(dev);
   if (node == NULL)
     return -1;
   udev_node_to_ids(node, &busnum, &devnum);
 
-  return device_del(busnum, devnum);
+  /* Cleanup xenstore if the device was assigned to a VM */
+  device = device_lookup(busnum, devnum);
+  if (device->vm != NULL) {
+    usbowls_build_usbinfo(busnum, devnum, device->vendorid, device->deviceid, &ui);
+    xenstore_get_dominfo(device->vm->domid, &di);
+    xenstore_destroy_usb(&di, &ui);
+  }
+
+  /* Delete the device from the global list */
+  ret = device_del(busnum, devnum);
+
+  return ret;
 }
 
 /**

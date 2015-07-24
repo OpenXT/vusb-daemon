@@ -47,6 +47,8 @@ static void fill_vms()
     }
 
     vm_add(domid, path + 4);
+    /* At this point, if the VM is running (domid > -1) we could run
+     * the sticky rules, but I don't think we should */
   }
 
   g_ptr_array_free(paths, TRUE);

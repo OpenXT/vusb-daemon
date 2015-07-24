@@ -277,6 +277,33 @@ policy_unset_sticky(int dev)
   return ret;
 }
 
+/**
+ * Search for a sticky rule matching a device, and return the
+ * corresponding UUID
+ *
+ * @param dev The device single ID
+ *
+ * @return The UUID if a sticky rule was found, NULL otherwise
+ */
+char*
+policy_get_sticky_uuid(int dev)
+{
+  int busid, devid;
+  device_t *device;
+  sticky_t *sticky;
+  int ret;
+
+  makeBusDevPair(dev, &busid, &devid);
+  device = device_lookup(busid, devid);
+  if (device == NULL)
+    return NULL;
+  sticky = sticky_lookup(device->vendorid, device->deviceid, device->shortname);
+  if (sticky != NULL)
+    return sticky->uuid;
+  else
+    return NULL;
+}
+
 static vm_t*
 vm_focused(void)
 {
@@ -297,7 +324,7 @@ vm_focused(void)
  *         usbowls_plug_device otherwise.
  */
 int
-policy_auto_assign(device_t *device)
+policy_auto_assign_new_device(device_t *device)
 {
   sticky_t *sticky;
   vm_t *vm = NULL;
@@ -322,6 +349,49 @@ policy_auto_assign(device_t *device)
   }
 
   return -1;
+}
+
+/**
+ * Iterate over all the sticky rules that match the VM, and assign the
+ * corresponding devices to it
+ *
+ * @param vm The VM that just started
+ *
+ * @return 0 for success, -1 if anything went wrong
+ */
+int
+policy_auto_assign_devices_to_new_vm(vm_t *vm)
+{
+  struct list_head *pos;
+  sticky_t *sticky;
+  device_t *device;
+  int ret = 0;
+
+  list_for_each(pos, &stickys.list) {
+    sticky = list_entry(pos, sticky_t, list);
+    if (!strcmp(sticky->uuid, vm->uuid)) {
+      device = device_lookup_by_attributes(sticky->vendorid,
+                                           sticky->deviceid,
+                                           sticky->serial);
+      if (device->vm != NULL) {
+        if (device->vm != vm)
+        {
+          xd_log(LOG_ERR, "An always-assign device is assigned to another VM, this shouldn't happen!");
+          ret = -1;
+          continue;
+        } else {
+          /* The device is already assigned to the right VM */
+          continue;
+        }
+      } else {
+        /* The device is not assigned, as expected, plug it to its VM */
+        device->vm = vm;
+        ret |= usbowls_plug_device(vm->domid, device->busid, device->devid);
+      }
+    }
+  }
+
+  return ret;
 }
 
 /**

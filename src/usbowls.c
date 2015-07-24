@@ -173,7 +173,7 @@ usbowls_plug_device(int domid, int bus, int device)
     return 1;
   }
 
-  if (xenstore_wait_for_online(&di, &ui) != 0)
+  if (xenstore_wait_for_online(&di, &ui) < 0)
     xd_log(LOG_ERR, "The frontend or the backend didn't go online, continue anyway");
 
   ret = vusb_assign(ui.usb_vendor, ui.usb_product, 1);

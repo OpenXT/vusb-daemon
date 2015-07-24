@@ -351,7 +351,7 @@ wait_for_states(char *bepath, char *fepath, enum XenBusStates a, enum XenBusStat
   fd = xs_fileno(xs_handle);
   while (tv.tv_sec != 0 || tv.tv_usec != 0)
   {
-    int b, f;
+    int bs, fs;
     fd_set set;
 
     FD_ZERO(&set);
@@ -362,11 +362,25 @@ wait_for_states(char *bepath, char *fepath, enum XenBusStates a, enum XenBusStat
     if (!FD_ISSET(fd, &set))
       continue;
     buf = xs_read(xs_handle, XBT_NULL, bstate, NULL);
-    b = *buf - '0';
+    if (buf == NULL) {
+      /* The backend tree is gone, probably because the VM got
+       * shutdown and the toolstack cleaned it out. Let's pretend
+       * it's all set */
+      ret = 1;
+      break;
+    } else {
+      bs = *buf - '0';
+    }
     buf = xs_read(xs_handle, XBT_NULL, fstate, NULL);
-    f = *buf - '0';
-    if ((f == a || f == b) &&
-        (b == a || b == b))
+    if (buf == NULL) {
+      /* Same as above */
+      ret = 1;
+      break;
+    } else {
+      fs = *buf - '0';
+    }
+    if ((fs == a || fs == b) &&
+        (bs == a || bs == b))
     {
       ret = 0;
       break;
@@ -452,7 +466,7 @@ xenstore_destroy_usb(dominfo_t *domp, usbinfo_t *usbp)
   snprintf(value, sizeof (value), "%d", XB_CLOSING);
   xenstore_set_keyval(XBT_NULL, bepath, "state", value);
 
-  if (xenstore_wait_for_offline(domp, usbp) == 0)
+  if (xenstore_wait_for_offline(domp, usbp) >= 0)
   {
     xs_rm(xs_handle, XBT_NULL, bepath);
     xs_rm(xs_handle, XBT_NULL, fepath);

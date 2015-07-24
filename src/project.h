@@ -92,20 +92,6 @@
 #define XENMGR      "com.citrix.xenclient.xenmgr" /**< The dbus name of xenmgr*/
 #define XENMGR_OBJ  "/"                           /**< The main dbus object of xenmgr*/
 
-#define DEV_STATE_ERROR       -1 /**< Cannot find device */
-#define DEV_STATE_UNUSED      0  /**< Device not in use by any VM */
-#define DEV_STATE_ASSIGNED    1  /**< Assigned to another VM which is off */
-#define DEV_STATE_IN_USE      2  /**< Assigned to another VM which is running */
-#define DEV_STATE_BLOCKED     3  /**< Blocked by policy for this VM */
-#define DEV_STATE_THIS        4  /**< In use by this VM */
-#define DEV_STATE_THIS_ALWAYS 5  /**< In use by this VM and flagged "always" */
-#define DEV_STATE_ALWAYS_ONLY 6  /**< Flagged as "always" assigned to this VM, but not currently in use */
-#define DEV_STATE_PLATFORM    7  /**< Special platform device, listed purely for information */
-#define DEV_STATE_HID_DOM0    8  /**< HiD device assigned to dom0 */
-#define DEV_STATE_HID_ALWAYS  9  /**< HiD device currently assigned to dom0, but always assigned to another VM */
-#define DEV_STATE_CD_DOM0     10 /**< External CD drive assigned to dom0 */
-#define DEV_STATE_CD_ALWAYS   11 /**< External CD drive currently assigned to dom0, but always assigned to another VM */
-
 /**
  * The (stupid) logging macro
  */
@@ -206,6 +192,7 @@ void  udev_event(void);
 void  udev_fill_devices(void);
 
 device_t* device_lookup(int busid, int devid);
+device_t* device_lookup_by_attributes(int vendorid, int deviceid, char *serial);
 device_t* device_add(int busid, int devid, int vendorid, int deviceid,
                      char *shortname, char *longname, char *sysname);
 int       device_del(int  busid, int  devid);
@@ -229,8 +216,10 @@ int   xenstore_init(void);
 void  xenstore_deinit(void);
 
 int   policy_init(void);
-int   policy_auto_assign(device_t *device);
+int   policy_auto_assign_new_device(device_t *device);
+int   policy_auto_assign_devices_to_new_vm(vm_t *vm);
 int   policy_set_sticky(int dev);
 int   policy_unset_sticky(int dev);
+char* policy_get_sticky_uuid(int dev);
 
 #endif

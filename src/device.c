@@ -33,7 +33,7 @@
  * Lookup a device in the list using its busid and devid
  *
  * @param busid The bus ID of the device
- * @param devid The device ID of the device
+ * @param devid The ID of the device on the bus
  *
  * @return A pointer to the device if found, NULL otherwise
  */
@@ -46,6 +46,34 @@ device_lookup(int busid, int devid)
   list_for_each(pos, &devices.list) {
     device = list_entry(pos, device_t, list);
     if (device->busid == busid && device->devid == devid) {
+      return device;
+    }
+  }
+
+  return NULL;
+}
+
+/**
+ * Lookup a device in the list using its vendor ID, device ID and serial
+ *
+ * @param vendorid The vendor ID of the device
+ * @param deviceid The device ID of the device
+ *
+ * @return A pointer to the first device found, NULL otherwise
+ */
+device_t*
+device_lookup_by_attributes(int vendorid,
+                            int deviceid,
+                            char *serial)
+{
+  struct list_head *pos;
+  device_t *device;
+
+  list_for_each(pos, &devices.list) {
+    device = list_entry(pos, device_t, list);
+    if (device->vendorid == vendorid &&
+        device->deviceid == deviceid &&
+        !(strcmp(device->shortname, serial))) {
       return device;
     }
   }
@@ -188,6 +216,31 @@ device_type(unsigned char class,
   size = strlen(tmp->value) + strlen(" - ") + strlen(tmp->subs[n].prots[m].value) + 1;
   res = malloc(size);
   snprintf(res, size, "%s - %s", tmp->value, tmp->subs[n].prots[m].value);
+
+  return res;
+}
+
+/**
+ * Iterate through all the devices attached to the VM and unplug them
+ *
+ * @param domid The domid of the VM
+ *
+ * @return 0 on complete success
+ */
+int
+device_unplug_all_from_vm(int domid)
+{
+  struct list_head *pos;
+  device_t *device;
+  int res = 0;
+
+  list_for_each(pos, &devices.list) {
+    device = list_entry(pos, device_t, list);
+    if (device->vm != NULL && device->vm->domid == domid) {
+      res |= usbowls_unplug_device(domid, device->busid, device->devid);
+      device->vm = NULL;
+    }
+  }
 
   return res;
 }

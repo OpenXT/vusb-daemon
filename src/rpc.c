@@ -19,6 +19,20 @@
 
 #include "project.h"
 
+#define DEV_STATE_ERROR       -1 /**< Cannot find device */
+#define DEV_STATE_UNUSED      0  /**< Device not in use by any VM */
+#define DEV_STATE_ASSIGNED    1  /**< *ALWAYS* Assigned to another VM which is off */
+#define DEV_STATE_IN_USE      2  /**< Assigned to another VM which is running */
+#define DEV_STATE_BLOCKED     3  /**< Blocked by policy for this VM */
+#define DEV_STATE_THIS        4  /**< In use by this VM */
+#define DEV_STATE_THIS_ALWAYS 5  /**< In use by this VM and flagged "always" */
+#define DEV_STATE_ALWAYS_ONLY 6  /**< Flagged as "always" assigned to this VM, but not currently in use */
+#define DEV_STATE_PLATFORM    7  /**< Special platform device, listed purely for information */
+#define DEV_STATE_HID_DOM0    8  /**< HiD device assigned to dom0 */
+#define DEV_STATE_HID_ALWAYS  9  /**< HiD device currently assigned to dom0, but always assigned to another VM */
+#define DEV_STATE_CD_DOM0     10 /**< External CD drive assigned to dom0 */
+#define DEV_STATE_CD_ALWAYS   11 /**< External CD drive currently assigned to dom0, but always assigned to another VM */
+
 #define SERVICE "com.citrix.xenclient.usbdaemon"
 #define SERVICE_OBJ_PATH "/"
 
@@ -68,20 +82,24 @@ void rpc_init(void)
  * /local/domain/2/vm = "/vm/00000000-0000-0000-0000-000000000001"
  * @endcode
  * @param domid The VM domid
+ *
+ * @return A pointer to the new VM, or NULL if it failed
  */
-static int add_vm(int domid)
+static vm_t*
+add_vm(int domid)
 {
   char *uuid;
+  vm_t *res;
 
   uuid = xenstore_dom_read(domid, "vm");
   if (uuid == NULL) {
     xd_log(LOG_ERR, "Couldn't find UUID for domid %d", domid);
-    return -1;
+    return NULL;
   }
-  vm_add(domid, uuid + 4);
+  res = vm_add(domid, uuid + 4);
   free(uuid);
 
-  return 0;
+  return res;
 }
 
 gboolean ctxusb_daemon_set_policy_domuuid(
@@ -113,17 +131,21 @@ gboolean ctxusb_daemon_get_policy_domuuid(
 gboolean ctxusb_daemon_new_vm(CtxusbDaemonObject *this,
                               gint IN_dom_id, GError **error)
 {
-  int ret;
+  vm_t *vm;
 
-  ret = add_vm(IN_dom_id);
+  vm = add_vm(IN_dom_id);
 
-  if (ret) {
+  if (vm == NULL) {
     g_set_error(error,
                 DBUS_GERROR,
                 DBUS_GERROR_FAILED,
                 "Failed to add VM %d", IN_dom_id);
     return FALSE;
   } else {
+    /* The VM was added correctly, let's run the sticky rules. If
+     * anything goes wrong, this will return non-0, but the RPC
+     * probably shouldn't fail... */
+    policy_auto_assign_devices_to_new_vm(vm);
     return TRUE;
   }
 }
@@ -132,6 +154,8 @@ gboolean ctxusb_daemon_vm_stopped(CtxusbDaemonObject *this,
                                   gint IN_dom_id, GError **error)
 {
   int ret;
+
+  device_unplug_all_from_vm(IN_dom_id);
 
   ret = vm_del(IN_dom_id);
 
@@ -190,16 +214,43 @@ gboolean ctxusb_daemon_get_device_info(CtxusbDaemonObject *this,
     return FALSE;
   }
   *OUT_name = g_strdup(device->shortname);
-  *OUT_state = 0;
+  /* Figure out the state and assigned VM for the device. Default to unused. */
+  /* We could simply output the assigned VM and an always-assign
+   * flag, but finding the right DEV_STATE is more fun, here goes... */
   if (device->vm != NULL) {
-    if (!strncmp(device->vm->uuid, IN_vm_uuid, UUID_LENGTH))
-      *OUT_state = DEV_STATE_THIS;
-    else
-      *OUT_state = DEV_STATE_ASSIGNED;
+    /* The device is currently assigned to a VM */
+    if (!strncmp(device->vm->uuid, IN_vm_uuid, UUID_LENGTH)) {
+      /* The VM is IN_vm_uuid */
+      char *uuid = policy_get_sticky_uuid(IN_dev_id);
+      if (!strncmp(uuid, IN_vm_uuid, UUID_LENGTH))
+        /* And it's always-assigned to it */
+        *OUT_state = DEV_STATE_THIS_ALWAYS;
+      else
+        /* But it's not always-assigned to it */
+        *OUT_state = DEV_STATE_THIS;
+    } else
+      /* The VM is not IN_vm_uuid */
+      *OUT_state = DEV_STATE_IN_USE;
+    /* Either way, the assigned VM is this */
     *OUT_vm_assigned = g_strdup(device->vm->uuid);
   } else {
-    *OUT_state = DEV_STATE_UNUSED;
-    *OUT_vm_assigned = g_strdup("");
+    /* The device is not currently assigned to a VM */
+    char *uuid = policy_get_sticky_uuid(IN_dev_id);
+    if (uuid != NULL) {
+      /* But it has an always-assign VM */
+      if (!strncmp(uuid, IN_vm_uuid, UUID_LENGTH))
+        /* Which is IN_vm_uuid */
+        *OUT_state = DEV_STATE_ALWAYS_ONLY;
+      else
+        /* Or not */
+        *OUT_state = DEV_STATE_ASSIGNED;
+      /* Either way, the assigned VM is this */
+      *OUT_vm_assigned = g_strdup(uuid);
+    } else {
+      /* It doesn't have an always-assign VM, it's all free */
+      *OUT_state = DEV_STATE_UNUSED;
+      *OUT_vm_assigned = g_strdup("");
+    }
   }
   *OUT_detail = g_strdup(device->longname);
 
@@ -212,6 +263,7 @@ gboolean ctxusb_daemon_assign_device(CtxusbDaemonObject *this,
   struct list_head *pos;
   device_t *device;
   vm_t *vm;
+  char *sticky_uuid;
   int busid, devid;
   int ret;
 
@@ -248,6 +300,21 @@ gboolean ctxusb_daemon_assign_device(CtxusbDaemonObject *this,
                 DBUS_GERROR,
                 DBUS_GERROR_FAILED,
                 "Can't assign device %d to stopped VM %s", IN_dev_id, IN_vm_uuid);
+    return FALSE;
+  }
+  if (device->vm != NULL) {
+    g_set_error(error,
+                DBUS_GERROR,
+                DBUS_GERROR_FAILED,
+                "Device %d is already assigned to a VM", IN_dev_id);
+    return FALSE;
+  }
+  sticky_uuid = policy_get_sticky_uuid(IN_dev_id);
+  if (sticky_uuid != NULL && strcmp(vm->uuid, sticky_uuid)) {
+    g_set_error(error,
+                DBUS_GERROR,
+                DBUS_GERROR_FAILED,
+                "Device %d is set to be always assigned to another VM", IN_dev_id);
     return FALSE;
   }
 
@@ -313,6 +380,14 @@ gboolean ctxusb_daemon_unassign_device(CtxusbDaemonObject *this,
 gboolean ctxusb_daemon_set_sticky(CtxusbDaemonObject *this,
                                   gint IN_dev_id, gint IN_sticky, GError **error)
 {
+  if (IN_sticky == 1 && policy_get_sticky_uuid(IN_dev_id) != NULL) {
+    g_set_error(error,
+                DBUS_GERROR,
+                DBUS_GERROR_FAILED,
+                "Device %d is set to be always assigned to a VM", IN_dev_id);
+    return FALSE;
+  }
+
   if (IN_sticky == 0)
     policy_unset_sticky(IN_dev_id);
   else

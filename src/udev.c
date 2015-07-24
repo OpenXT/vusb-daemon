@@ -282,7 +282,7 @@ udev_maybe_add_device(struct udev_device *dev, int auto_assign)
   udev_find_more(dev, device);
 
   if (auto_assign > 0)
-    policy_auto_assign(device);
+    policy_auto_assign_new_device(device);
 
   return device;
 }

@@ -222,7 +222,7 @@ gboolean ctxusb_daemon_get_device_info(CtxusbDaemonObject *this,
     if (!strncmp(device->vm->uuid, IN_vm_uuid, UUID_LENGTH)) {
       /* The VM is IN_vm_uuid */
       char *uuid = policy_get_sticky_uuid(IN_dev_id);
-      if (!strncmp(uuid, IN_vm_uuid, UUID_LENGTH))
+      if (uuid != NULL && !strncmp(uuid, IN_vm_uuid, UUID_LENGTH))
         /* And it's always-assigned to it */
         *OUT_state = DEV_STATE_THIS_ALWAYS;
       else

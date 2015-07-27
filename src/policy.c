@@ -316,12 +316,12 @@ vm_focused(void)
 
 /**
  * This function should be called when a new device is plugged.
- * It will assign the device to a VM if a sticky rule says so.
+ * It will assign the device to a VM according to policy.
  *
  * @param device A pointer to the device that was just plugged
  *
- * @return -1 if no sticky rules matches the device, the result of
- *         usbowls_plug_device otherwise.
+ * @return 1 if the device didn't get plugged to anything, the result
+ *         of usbowls_plug_device otherwise.
  */
 int
 policy_auto_assign_new_device(device_t *device)
@@ -330,14 +330,19 @@ policy_auto_assign_new_device(device_t *device)
   vm_t *vm = NULL;
   int uivm;
 
+  /* If there's a sticky rule for the device, assign the the
+   * corresponding VM (if it's running). If there's no sticky rule
+   * for the device, consider assigning it to the focused VM */
   sticky = sticky_lookup(device->vendorid, device->deviceid, device->shortname);
-  if (sticky != NULL)
+  if (sticky != NULL) {
     vm = vm_lookup_by_uuid(sticky->uuid);
-  if (vm == NULL && auto_assign_to_focused_vm)
-    vm = vm_focused();
+  } else {
+    if (vm == NULL && auto_assign_to_focused_vm)
+      vm = vm_focused();
+  }
 
   property_get_com_citrix_xenclient_xenmgr_vm_domid_(g_xcbus, XENMGR, UIVM_PATH, &uivm);
-  if (vm != NULL && vm->domid != 0 && vm->domid != uivm)
+  if (vm != NULL && vm->domid > 0 && vm->domid != uivm)
   {
     int res;
 
@@ -348,7 +353,7 @@ policy_auto_assign_new_device(device_t *device)
     return res;
   }
 
-  return -1;
+  return 1;
 }
 
 /**
@@ -373,6 +378,10 @@ policy_auto_assign_devices_to_new_vm(vm_t *vm)
       device = device_lookup_by_attributes(sticky->vendorid,
                                            sticky->deviceid,
                                            sticky->serial);
+      if (device == NULL) {
+        /* The device is not there right now, moving on */
+        continue;
+      }
       if (device->vm != NULL) {
         if (device->vm != vm)
         {

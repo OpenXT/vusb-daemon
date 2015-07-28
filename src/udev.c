@@ -317,7 +317,7 @@ udev_node_to_ids(const char *node, int *busid, int *devid)
  *
  * @param dev Udev handle of the device
  *
- * @return 0 on success, -1 on failure
+ * @return 0 on success, 1 if nothing happened, -1 on failure
  */
 int
 udev_del_device(struct udev_device *dev)
@@ -339,6 +339,11 @@ udev_del_device(struct udev_device *dev)
 
   /* Cleanup xenstore if the device was assigned to a VM */
   device = device_lookup(busnum, devnum);
+  if (device == NULL) {
+    /* This happens if udev_maybe_add_device failed earlier, like on
+     * quick plug-unplug */
+    return 1;
+  }
   if (device->vm != NULL) {
     usbowls_build_usbinfo(busnum, devnum, device->vendorid, device->deviceid, &ui);
     xenstore_get_dominfo(device->vm->domid, &di);
@@ -410,6 +415,8 @@ udev_event(void)
         printf("   Keyboard: %d\n", device->keyboard);
         printf("ADDED\n");
       } else {
+        /* This seems to happen when a device is quickly plugged and
+         * unplugged. */
         printf("NOT ADDED\n");
       }
     }

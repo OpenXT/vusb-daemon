@@ -16,7 +16,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
-DBUS_CLIENT_IDLS = xenmgr xenmgr_vm
+DBUS_CLIENT_IDLS = db input_daemon xenmgr xenmgr_vm
 DBUS_SERVER_IDLS = ctxusb_daemon
 
 AM_CFLAGS = -finput-charset=UTF-8 -std=gnu99 -DROOT_UID=0 -DHAVE_ARCH_STRUCT_FLOCK -DUSE_DBUS -DHAVE_ARCH_STRUCT_FLOCK

@@ -78,8 +78,10 @@
 #include <usb.h>
 /* #include <libusb-1.0/libusb.h> */
 
-#include "rpcgen/xenmgr_vm_client.h"
+#include "rpcgen/db_client.h"
+#include "rpcgen/input_daemon_client.h"
 #include "rpcgen/xenmgr_client.h"
+#include "rpcgen/xenmgr_vm_client.h"
 #include "list.h"
 #include "classes.h"
 
@@ -91,6 +93,9 @@
 
 #define XENMGR      "com.citrix.xenclient.xenmgr" /**< The dbus name of xenmgr*/
 #define XENMGR_OBJ  "/"                           /**< The main dbus object of xenmgr*/
+
+#define DB          "com.citrix.xenclient.db"
+#define DB_OBJ      "/"
 
 /**
  * The (stupid) logging macro
@@ -198,6 +203,8 @@ device_t* device_add(int busid, int devid, int vendorid, int deviceid,
 int       device_del(int  busid, int  devid);
 char*     device_type(unsigned char class, unsigned char subclass,
                       unsigned char protocol);
+int       device_unplug_all_from_vm(int domid);
+
 
 vm_t* vm_lookup(const int domid);
 vm_t* vm_lookup_by_uuid(const char *uuid);
@@ -216,10 +223,9 @@ int   xenstore_init(void);
 void  xenstore_deinit(void);
 
 int   policy_init(void);
-int   policy_auto_assign_new_device(device_t *device);
-int   policy_auto_assign_devices_to_new_vm(vm_t *vm);
 int   policy_set_sticky(int dev);
 int   policy_unset_sticky(int dev);
-char* policy_get_sticky_uuid(int dev);
+int   policy_auto_assign_new_device(device_t *device);
+int   policy_auto_assign_devices_to_new_vm(vm_t *vm);
 
 #endif

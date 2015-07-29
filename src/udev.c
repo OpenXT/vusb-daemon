@@ -421,8 +421,10 @@ udev_event(void)
       }
     }
     if (!strcmp(action, "remove")) {
-      udev_del_device(dev);
-      printf("REMOVED\n");
+      if (udev_del_device(dev) == 0)
+        printf("REMOVED\n");
+      else
+        printf("NOT REMOVED\n");
     }
     udev_device_unref(dev);
   }

@@ -70,6 +70,10 @@ void rpc_init(void)
     xd_log(LOG_ERR, "failed to export server object");
     exit(1);
   }
+  /* Wait until all the services we talk to are up */
+  xcdbus_wait_service(g_xcbus, "com.citrix.xenclient.db");
+  xcdbus_wait_service(g_xcbus, "com.citrix.xenclient.input");
+  xcdbus_wait_service(g_xcbus, "com.citrix.xenclient.xenmgr");
 }
 
 /**
@@ -380,7 +384,7 @@ gboolean ctxusb_daemon_unassign_device(CtxusbDaemonObject *this,
 gboolean ctxusb_daemon_set_sticky(CtxusbDaemonObject *this,
                                   gint IN_dev_id, gint IN_sticky, GError **error)
 {
-  if (IN_sticky == 1 && policy_get_sticky_uuid(IN_dev_id) != NULL) {
+  if (IN_sticky == 1 && false/* && policy_get_sticky_uuid(IN_dev_id) != NULL */) {
     g_set_error(error,
                 DBUS_GERROR,
                 DBUS_GERROR_FAILED,

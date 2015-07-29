@@ -54,10 +54,12 @@ device_lookup(int busid, int devid)
 }
 
 /**
- * Lookup a device in the list using its vendor ID, device ID and serial
+ * Lookup a device in the list using its vendor ID, device ID and
+ * serial. If the serial is NULL, ignore it
  *
  * @param vendorid The vendor ID of the device
  * @param deviceid The device ID of the device
+ * @param serial   The serial of the device, or NULL
  *
  * @return A pointer to the first device found, NULL otherwise
  */
@@ -73,7 +75,7 @@ device_lookup_by_attributes(int vendorid,
     device = list_entry(pos, device_t, list);
     if (device->vendorid == vendorid &&
         device->deviceid == deviceid &&
-        !(strcmp(device->shortname, serial))) {
+        (serial == NULL || !(strcmp(device->shortname, serial)))) {
       return device;
     }
   }

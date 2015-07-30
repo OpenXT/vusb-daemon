@@ -60,32 +60,85 @@ udev_init(void)
 }
 
 static void
+udev_find_more_about_input(struct udev_device *udev_device,  device_t *device)
+{
+  const char *value;
+
+  /* First, check if the id_input module considered the device, to
+   * avoid wasting time */
+  value = udev_device_get_property_value(udev_device, "ID_INPUT");
+  if (value == NULL || *value == '0')
+    return;
+
+  /* The udev module id_input provides: */
+  /* ID_INPUT_ACCELEROMETER */
+  /* ID_INPUT_JOYSTICK      == GAME_CONTROLLER */
+  /* ID_INPUT_KEY */
+  /* ID_INPUT_KEYBOARD      == KEYBOARD */
+  /* ID_INPUT_MOUSE         == MOUSE */
+  /* ID_INPUT_TABLET */
+  /* ID_INPUT_TOUCHPAD      == MOUSE */
+  /* ID_INPUT_TOUCHSCREEN */
+  value = udev_device_get_property_value(udev_device, "ID_INPUT_KEYBOARD");
+  if (value != NULL && *value != '0')
+    device->type |= KEYBOARD;
+  value = udev_device_get_property_value(udev_device, "ID_INPUT_MOUSE");
+  if (value != NULL && *value != '0')
+    device->type |= MOUSE;
+  value = udev_device_get_property_value(udev_device, "ID_INPUT_TOUCHPAD");
+  if (value != NULL && *value != '0')
+    device->type |= MOUSE;
+  value = udev_device_get_property_value(udev_device, "ID_INPUT_JOYSTICK");
+  if (value != NULL && *value != '0')
+    device->type |= GAME_CONTROLLER;
+}
+
+static void
+class_to_device(char *class, device_t *device)
+{
+  int c;
+
+  if (class != NULL)
+  {
+    c = strtol(class, NULL, 16);
+    if (c == 0x08)
+      device->type |= MASS_STORAGE;
+  }
+}
+
+static void
+udev_find_more_about_class(struct udev_device *udev_device,  device_t *device)
+{
+  const char *value;
+  int class;
+
+  value = udev_device_get_sysattr_value(udev_device, "bDeviceClass");
+  class_to_device(value, device);
+  value = udev_device_get_sysattr_value(udev_device, "bInterfaceClass");
+  class_to_device(value, device);
+}
+
+/**
+ * Look at all the childs of a given device to figure out more about
+ * what it does
+ */
+static void
 udev_find_more(struct udev_device *dev, device_t *device)
 {
   struct udev_enumerate *enumerate;
   struct udev_list_entry *udev_device_list, *udev_device_entry;
   struct udev_device *udev_device;
   const char *path;
-  const char *value;
 
   enumerate = udev_enumerate_new(udev_handle);
   udev_enumerate_add_match_parent(enumerate, dev);
-  udev_enumerate_add_match_property(enumerate, "ID_INPUT", "1");
   udev_enumerate_scan_devices(enumerate);
   udev_device_list = udev_enumerate_get_list_entry(enumerate);
   udev_list_entry_foreach(udev_device_entry, udev_device_list) {
     path = udev_list_entry_get_name(udev_device_entry);
     udev_device = udev_device_new_from_syspath(udev_handle, path);
-    value = udev_device_get_property_value(udev_device, "ID_INPUT_KEY");
-    if (value != NULL && *value != '0') {
-      device->type |= KEYBOARD;
-      continue;
-    }
-    value = udev_device_get_property_value(udev_device, "ID_INPUT_MOUSE");
-    if (value != NULL && *value != '0') {
-      device->type |= MOUSE;
-      continue;
-    }
+    udev_find_more_about_input(udev_device, device);
+    udev_find_more_about_class(udev_device, device);
     udev_device_unref(udev_device);
   }
 
@@ -423,6 +476,8 @@ udev_event(void)
       if (device != NULL) {
         printf("   Mouse: %d\n", !!(device->type & MOUSE));
         printf("   Keyboard: %d\n", !!(device->type & KEYBOARD));
+        printf("   Joystick: %d\n", !!(device->type & GAME_CONTROLLER));
+        printf("   MassStorage: %d\n", !!(device->type & MASS_STORAGE));
         printf("ADDED\n");
       } else {
         /* This seems to happen when a device is quickly plugged and

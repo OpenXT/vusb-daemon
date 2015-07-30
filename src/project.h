@@ -85,6 +85,9 @@
 #include "list.h"
 #include "classes.h"
 
+#include "policy.h"
+#include "db.h"
+
 #define UUID_LENGTH 37 /**< Length of UUIDs, including the string terminator */
 #define DOM0_DOMID  0  /**< Dom0's domid... */
 #define DOM0_UUID   "00000000-0000-0000-0000-000000000000" /**< Dom0's UUID */
@@ -93,9 +96,6 @@
 
 #define XENMGR      "com.citrix.xenclient.xenmgr" /**< The dbus name of xenmgr*/
 #define XENMGR_OBJ  "/"                           /**< The main dbus object of xenmgr*/
-
-#define DB          "com.citrix.xenclient.db"
-#define DB_OBJ      "/"
 
 /**
  * The (stupid) logging macro
@@ -225,6 +225,7 @@ void  xenstore_deinit(void);
 int   policy_init(void);
 int   policy_set_sticky(int dev);
 int   policy_unset_sticky(int dev);
+char* policy_get_sticky_uuid(int dev);
 int   policy_auto_assign_new_device(device_t *device);
 int   policy_auto_assign_devices_to_new_vm(vm_t *vm);
 

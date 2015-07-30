@@ -71,7 +71,6 @@ void rpc_init(void)
     exit(1);
   }
   /* Wait until all the services we talk to are up */
-  xcdbus_wait_service(g_xcbus, "com.citrix.xenclient.db");
   xcdbus_wait_service(g_xcbus, "com.citrix.xenclient.input");
   xcdbus_wait_service(g_xcbus, "com.citrix.xenclient.xenmgr");
 }

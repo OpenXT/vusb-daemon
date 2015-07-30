@@ -129,8 +129,7 @@ typedef struct {
   char *longname;        /**< Longer name shown nowhere I know of, usually sysattr["manufacturer"] */
   char *sysname;         /**< Name in sysfs */
   vm_t *vm;              /**< VM currently using the device, or NULL for dom0 */
-  int keyboard;          /**< 1 if we determined the device is a keyboard, 0 otherwise */
-  int mouse;             /**< 1 if we determined the device is a mouse, 0 otherwise */
+  int type;              /**< Type of the device, can be multiple types OR-ed together. see policy.h */
 } device_t;
 
 typedef struct dominfo
@@ -223,6 +222,7 @@ int   xenstore_init(void);
 void  xenstore_deinit(void);
 
 int   policy_init(void);
+bool  policy_is_allowed(device_t *device, vm_t *vm);
 int   policy_set_sticky(int dev);
 int   policy_unset_sticky(int dev);
 char* policy_get_sticky_uuid(int dev);

@@ -61,6 +61,71 @@ dump_rules(void)
   printf("-------------------------\n");
 }
 
+static vm_t*
+vm_focused(void)
+{
+  int domid;
+
+  xcdbus_input_get_focus_domid(g_xcbus, &domid);
+
+  return vm_lookup(domid);
+}
+
+static bool
+device_matches_rule(rule_t *rule, device_t *device)
+{
+  /* If the rule specifies a vendorid, it has to match */
+  if (rule->dev_vendorid != 0 &&
+      device->vendorid != rule->dev_vendorid)
+    return FALSE;
+  /* If the rule specifies a deviceid, it has to match */
+  if (rule->dev_deviceid != 0 &&
+      device->deviceid != rule->dev_deviceid)
+    return FALSE;
+  /* device->type must have at least all the bits from rule->dev_type */
+  if (rule->dev_type != 0 &&
+      (device->type & rule->dev_type) != rule->dev_type)
+    return FALSE;
+  /* device->type must have no bit in common with rule->dev_not_type */
+  if (rule->dev_not_type != 0 &&
+      (device->type & rule->dev_not_type))
+    return FALSE;
+  printf("device matches rule\n");
+
+  /* Everything specified matches, we're good */
+  return TRUE;
+}
+
+static bool
+vm_matches_rule(rule_t *rule, vm_t *vm)
+{
+  /* If the rule specifies a VM UUID it has to match */
+  if (rule->vm_uuid != NULL &&
+      strcmp(rule->vm_uuid, vm->uuid))
+    return FALSE;
+  printf("VM matches rule\n");
+
+  /* Everything specified matches, we're good */
+  return TRUE;
+}
+
+static rule_t*
+sticky_lookup(device_t *device)
+{
+  struct list_head *pos;
+  rule_t *rule;
+
+  list_for_each(pos, &rules.list) {
+    rule = list_entry(pos, rule_t, list);
+    if (rule->cmd == ALWAYS &&
+        device_matches_rule(rule, device)) {
+      return rule;
+    }
+  }
+
+  return NULL;
+}
+
 /**
  * Create a new sticky rule using a device and its currently assigned
  * VM, then rewrite the rules to the database
@@ -104,25 +169,6 @@ policy_set_sticky(int dev)
   db_write_policy(&rules);
 
   return 0;
-}
-
-static rule_t*
-sticky_lookup(device_t *device)
-{
-  struct list_head *pos;
-  rule_t *rule;
-
-  list_for_each(pos, &rules.list) {
-    rule = list_entry(pos, rule_t, list);
-    /* IMPORTANT TODO: compare only relevant fields */
-    if (rule->cmd == ALWAYS &&
-        rule->dev_vendorid == device->vendorid &&
-        rule->dev_deviceid == device->deviceid) {
-      return rule;
-    }
-  }
-
-  return NULL;
 }
 
 /**
@@ -180,14 +226,23 @@ policy_get_sticky_uuid(int dev)
     return NULL;
 }
 
-static vm_t*
-vm_focused(void)
+bool
+policy_is_allowed(device_t *device, vm_t *vm)
 {
-  int domid;
+  struct list_head *pos;
+  rule_t *rule;
 
-  xcdbus_input_get_focus_domid(g_xcbus, &domid);
+  list_for_each(pos, &rules.list) {
+    rule = list_entry(pos, rule_t, list);
+    /* First match wins (or looses), ALWAYS implies ALLOW */
+    xd_log(LOG_ERR, "%s\n", rule->vm_uuid);
+    if (device_matches_rule(rule, device) &&
+        vm_matches_rule(rule, vm))
+      return (rule->cmd != DENY);
+  }
 
-  return vm_lookup(domid);
+  /* No match found, default to DENY. Return TRUE here to default to ALLOW */
+  return FALSE;
 }
 
 /**
@@ -218,7 +273,10 @@ policy_auto_assign_new_device(device_t *device)
   }
 
   property_get_com_citrix_xenclient_xenmgr_vm_domid_(g_xcbus, XENMGR, UIVM_PATH, &uivm);
-  if (vm != NULL && vm->domid > 0 && vm->domid != uivm)
+  if (vm != NULL &&
+      vm->domid > 0 &&
+      vm->domid != uivm &&
+      policy_is_allowed(device, vm))
   {
     int res;
 
@@ -243,35 +301,37 @@ policy_auto_assign_new_device(device_t *device)
 int
 policy_auto_assign_devices_to_new_vm(vm_t *vm)
 {
-  struct list_head *pos;
+  struct list_head *pos, *device_pos;
   rule_t *rule;
   device_t *device;
   int ret = 0;
 
+  /* For all the ALWAYS rules that match the VM, assign all devices
+   * that match the rule to the VM */
   list_for_each(pos, &rules.list) {
     rule = list_entry(pos, rule_t, list);
     if (rule->cmd == ALWAYS && !strcmp(rule->vm_uuid, vm->uuid)) {
-      device = device_lookup_by_attributes(rule->dev_vendorid,
-                                           rule->dev_deviceid,
-                                           NULL);
-      if (device == NULL) {
-        /* The device is not there right now, moving on */
-        continue;
-      }
-      if (device->vm != NULL) {
-        if (device->vm != vm)
-        {
-          xd_log(LOG_ERR, "An always-assign device is assigned to another VM, this shouldn't happen!");
-          ret = -1;
+      list_for_each(device_pos, &devices.list) {
+        device = list_entry(device_pos, device_t, list);
+        if (!device_matches_rule(rule, device))
           continue;
+        /* The device matches the rule, let's try to assign it */
+        if (device->vm != NULL) {
+          if (device->vm != vm)
+          {
+            xd_log(LOG_ERR, "An always-assign device is assigned to another VM, this shouldn't happen!");
+            ret = -1;
+            continue;
+          } else {
+            /* The device is already assigned to the right VM */
+            continue;
+          }
         } else {
-          /* The device is already assigned to the right VM */
-          continue;
+          /* The device is not assigned, as expected, plug it to its VM */
+          /* No need to check the policy, ALWAYS implies ALLOW */
+          device->vm = vm;
+          ret |= usbowls_plug_device(vm->domid, device->busid, device->devid);
         }
-      } else {
-        /* The device is not assigned, as expected, plug it to its VM */
-        device->vm = vm;
-        ret |= usbowls_plug_device(vm->domid, device->busid, device->devid);
       }
     }
   }

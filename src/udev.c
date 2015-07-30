@@ -68,12 +68,12 @@ udev_find_more(struct udev_device *dev, device_t *device)
     udev_device = udev_device_new_from_syspath(udev_handle, path);
     value = udev_device_get_property_value(udev_device, "ID_INPUT_KEY");
     if (value != NULL && *value != '0') {
-      device->keyboard = 1;
+      device->type |= KEYBOARD;
       continue;
     }
     value = udev_device_get_property_value(udev_device, "ID_INPUT_MOUSE");
     if (value != NULL && *value != '0') {
-      device->mouse = 1;
+      device->type |= MOUSE;
       continue;
     }
     udev_device_unref(udev_device);
@@ -411,8 +411,8 @@ udev_event(void)
     if (!strcmp(action, "add")) {
       device = udev_maybe_add_device(dev, 1);
       if (device != NULL) {
-        printf("   Mouse: %d\n", device->mouse);
-        printf("   Keyboard: %d\n", device->keyboard);
+        printf("   Mouse: %d\n", !!(device->type & MOUSE));
+        printf("   Keyboard: %d\n", !!(device->type & KEYBOARD));
         printf("ADDED\n");
       } else {
         /* This seems to happen when a device is quickly plugged and

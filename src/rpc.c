@@ -320,6 +320,13 @@ gboolean ctxusb_daemon_assign_device(CtxusbDaemonObject *this,
                 "Device %d is set to be always assigned to another VM", IN_dev_id);
     return FALSE;
   }
+  if (!policy_is_allowed(device, vm)) {
+    g_set_error(error,
+                DBUS_GERROR,
+                DBUS_GERROR_FAILED,
+                "The policy denied assignation of device %d to VM %s", IN_dev_id, IN_vm_uuid);
+    return FALSE;
+  }
 
   device->vm = vm;
   ret = usbowls_plug_device(vm->domid, device->busid, device->devid);

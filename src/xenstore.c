@@ -16,6 +16,16 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/**
+ * @file   xenstore.c
+ * @author Jed Lejosne <lejosnej@ainfosec.com>
+ * @date   Thu Jul 30 13:20:01 2015
+ *
+ * @brief  XenStore interaction
+ *
+ * Functions to read/write various information from/to XenStore
+ */
+
 #include "project.h"
 
 /**
@@ -33,7 +43,7 @@ xmalloc(size_t size)
     exit(2);
   }
 
-  return (p);
+  return p;
 }
 
 /*
@@ -57,7 +67,7 @@ xasprintf(const char *fmt, ...)
   vsprintf(s, fmt, ap);
   va_end(ap);
 
-  return (s);
+  return s;
 }
 
 /*
@@ -71,7 +81,7 @@ xenstore_add_dir(xs_transaction_t xt, char *path, int d0, int p0, int d1, int p1
   xd_log(LOG_VERBOSE_DEBUG, "Making %s in XenStore", path);
   if (xs_mkdir(xs_handle, xt, path) == false) {
     xd_log(LOG_ERR, "XenStore error mkdir()ing %s", path);
-    return (-1);
+    return -1;
   }
 
   perms[0].perms = p0;
@@ -82,10 +92,10 @@ xenstore_add_dir(xs_transaction_t xt, char *path, int d0, int p0, int d1, int p1
     xd_log(LOG_ERR, "XenStore error setting permissions on %s",
            path);
     xs_rm(xs_handle, xt, path);
-    return (-1);
+    return -1;
   }
 
-  return (0);
+  return 0;
 }
 
 /**
@@ -153,6 +163,7 @@ xenstore_get_keyval(char *path, char *key)
   char tmppath[256];
 
   snprintf(tmppath, sizeof(tmppath), "%s/%s", path, key);
+
   return xs_read(xs_handle, XBT_NULL, tmppath, NULL);
 }
 
@@ -172,10 +183,10 @@ xenstore_set_keyval(xs_transaction_t xt, char *path, char *key, char *val)
 
   if (xs_write(xs_handle, xt, path, val, strlen(val)) == false) {
     xd_log(LOG_ERR, "XenStore error writing %s", path);
-    return (-1);
+    return -1;
   }
 
-  return (0);
+  return 0;
 }
 
 static char*
@@ -319,14 +330,15 @@ xenstore_create_usb(dominfo_t *domp, usbinfo_t *usbp)
     xd_log(LOG_DEBUG, "Finished creating VUSB node for %d.%d",
            usbp->usb_bus, usbp->usb_device);
 
-    return (0);
+    return 0;
   }
 
   xs_transaction_end(xs_handle, trans, true);
   xd_log(LOG_ERR, "Failed to write usb info to XenStore");
   free(fepath);
   free(bepath);
-  return (-1);
+
+  return -1;
 }
 
 static int

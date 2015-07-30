@@ -142,8 +142,8 @@ typedef struct dominfo
 typedef struct usbinfo
 {
   int usb_virtid;
-  int usb_bus;  /* USB bus in the physical machine */
-  int usb_device;       /* USB device in the physical machine */
+  int usb_bus;           /**< USB bus in the physical machine */
+  int usb_device;        /**< USB device in the physical machine */
   int usb_vendor;
   int usb_product;
 } usbinfo_t;

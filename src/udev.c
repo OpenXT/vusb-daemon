@@ -16,6 +16,16 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/**
+ * @file   udev.c
+ * @author Jed Lejosne <lejosnej@ainfosec.com>
+ * @date   Thu Jul 30 13:20:45 2015
+ *
+ * @brief  Udev interaction
+ *
+ * Functions that handle udev events and other udev requests
+ */
+
 #include "project.h"
 
 /**

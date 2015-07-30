@@ -16,6 +16,18 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/**
+ * @file   db.c
+ * @author Jed Lejosne <lejosnej@ainfosec.com>
+ * @date   Thu Jul 30 13:13:27 2015
+ *
+ * @brief  Database interaction
+ *
+ * Functions to read/write the policy from/to the database.
+ * This file should stay as separate as possible from the main
+ * project, to be usable in other programs (like a rule manager)
+ */
+
 #include "db.h"
 
 #define db_log(I, ...) { fprintf(stderr, ##__VA_ARGS__); fprintf(stderr, "\n"); }
@@ -201,6 +213,12 @@ add_rule_to_list(rule_t *rules, rule_t *new_rule)
     list_add_tail(&new_rule->list, &rules->list);
 }
 
+/**
+ * Initalize the database bits.
+ * This should be called before any other db_ function.
+ *
+ * @param xcbus_conn An xcdbus open connection
+ */
 void
 db_dbus_init(xcdbus_conn_t *xcbus_conn)
 {
@@ -209,6 +227,11 @@ db_dbus_init(xcdbus_conn_t *xcbus_conn)
   xcdbus_wait_service(db_xcbus, "com.citrix.xenclient.db");
 }
 
+/**
+ * Read the policy from the database
+ *
+ * @param rules Initialized rule list to store the policy
+ */
 void
 db_read_policy(rule_t *rules)
 {
@@ -225,6 +248,11 @@ db_read_policy(rule_t *rules)
   }
 }
 
+/**
+ * Dump the policy to the database
+ *
+ * @param rules The list of rules to write
+ */
 void
 db_write_policy(rule_t *rules)
 {

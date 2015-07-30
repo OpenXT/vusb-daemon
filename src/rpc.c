@@ -17,6 +17,16 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/**
+ * @file   rpc.c
+ * @author Jed Lejosne <lejosnej@ainfosec.com>
+ * @date   Thu Jul 30 13:22:55 2015
+ *
+ * @brief  DBus service
+ *
+ * Implementation of the dbus methods we expose
+ */
+
 #include "project.h"
 
 #define DEV_STATE_ERROR       -1 /**< Cannot find device */

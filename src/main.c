@@ -16,6 +16,16 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/**
+ * @file   main.c
+ * @author Jed Lejosne <lejosnej@ainfosec.com>
+ * @date   Thu Jul 30 13:24:08 2015
+ *
+ * @brief  vUSB daemon
+ *
+ * Daemon that handles USB device passthrough
+ */
+
 #include "project.h"
 
 static void fill_vms()

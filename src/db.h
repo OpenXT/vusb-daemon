@@ -16,6 +16,17 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/**
+ * @file   db.h
+ * @author Jed Lejosne <lejosnej@ainfosec.com>
+ * @date   Thu Jul 30 13:41:28 2015
+ *
+ * @brief  Database interaction declarations
+ *
+ * This should be included in any project that needs to interract with
+ * the policy.
+ */
+
 #ifndef   	DB_H_
 # define   	DB_H_
 

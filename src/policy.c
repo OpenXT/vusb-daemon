@@ -234,6 +234,9 @@ policy_get_sticky_uuid(int dev)
     return NULL;
 }
 
+/**
+ * Check if the policy allows a given device to be assigned to a given VM
+ */
 bool
 policy_is_allowed(device_t *device, vm_t *vm)
 {
@@ -250,7 +253,7 @@ policy_is_allowed(device_t *device, vm_t *vm)
   }
 
   /* No match found, default to DENY. Return TRUE here to default to ALLOW */
-  return FALSE;
+  return false;
 }
 
 /**

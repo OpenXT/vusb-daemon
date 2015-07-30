@@ -28,14 +28,22 @@
 
 #include "project.h"
 
-/**
- * If this stays true, it means devices are automatically assigned to
- * the VM that currently has the focus (unless there's a sticky rule
- * for assigning it to another running VM)
- */
-static bool auto_assign_to_focused_vm = true;
-
 rule_t rules;
+
+static bool
+vm_gets_devices_when_in_focus(vm_t *vm)
+{
+  char *obj_path = NULL;
+  gboolean v;
+
+  if (!com_citrix_xenclient_xenmgr_find_vm_by_domid_(g_xcbus, "com.citrix.xenclient.xenmgr", "/", vm->domid, &obj_path))
+    return false;
+
+  if (!property_get_com_citrix_xenclient_xenmgr_vm_usb_auto_passthrough_(g_xcbus, "com.citrix.xenclient.xenmgr", obj_path, &v))
+    return false;
+
+  return (v == TRUE) ? true : false;
+}
 
 static void
 dump_rules(void)
@@ -77,23 +85,23 @@ device_matches_rule(rule_t *rule, device_t *device)
   /* If the rule specifies a vendorid, it has to match */
   if (rule->dev_vendorid != 0 &&
       device->vendorid != rule->dev_vendorid)
-    return FALSE;
+    return false;
   /* If the rule specifies a deviceid, it has to match */
   if (rule->dev_deviceid != 0 &&
       device->deviceid != rule->dev_deviceid)
-    return FALSE;
+    return false;
   /* device->type must have at least all the bits from rule->dev_type */
   if (rule->dev_type != 0 &&
       (device->type & rule->dev_type) != rule->dev_type)
-    return FALSE;
+    return false;
   /* device->type must have no bit in common with rule->dev_not_type */
   if (rule->dev_not_type != 0 &&
       (device->type & rule->dev_not_type))
-    return FALSE;
+    return false;
   printf("device matches rule\n");
 
   /* Everything specified matches, we're good */
-  return TRUE;
+  return true;
 }
 
 static bool
@@ -102,11 +110,11 @@ vm_matches_rule(rule_t *rule, vm_t *vm)
   /* If the rule specifies a VM UUID it has to match */
   if (rule->vm_uuid != NULL &&
       strcmp(rule->vm_uuid, vm->uuid))
-    return FALSE;
+    return false;
   printf("VM matches rule\n");
 
   /* Everything specified matches, we're good */
-  return TRUE;
+  return true;
 }
 
 static rule_t*
@@ -268,8 +276,11 @@ policy_auto_assign_new_device(device_t *device)
   if (rule != NULL) {
     vm = vm_lookup_by_uuid(rule->vm_uuid);
   } else {
-    if (vm == NULL && auto_assign_to_focused_vm)
+    if (vm == NULL) {
       vm = vm_focused();
+      if (!vm_gets_devices_when_in_focus(vm))
+        vm = NULL;
+    }
   }
 
   property_get_com_citrix_xenclient_xenmgr_vm_domid_(g_xcbus, XENMGR, UIVM_PATH, &uivm);

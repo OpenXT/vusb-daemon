@@ -103,6 +103,35 @@ vm_focused(void)
 }
 
 static bool
+device_matches_udev_rule(rule_t *rule, device_t *device)
+{
+  char *value;
+  char **pairs;
+
+  if (rule->dev_sysattrs != NULL) {
+    pairs = rule->dev_sysattrs;
+    while (*pairs != NULL) {
+      value = udev_device_get_sysattr_value(device->udev, *pairs);
+      if (strcmp(*(pairs + 1), value))
+        return false;
+      pairs += 2;
+    }
+  }
+
+  if (rule->dev_properties != NULL) {
+    pairs = rule->dev_properties;
+    while (*pairs != NULL) {
+      value = udev_device_get_property_value(device->udev, *pairs);
+      if (strcmp(*(pairs + 1), value))
+        return false;
+      pairs += 2;
+    }
+  }
+
+  return true;
+}
+
+static bool
 device_matches_rule(rule_t *rule, device_t *device)
 {
   /* If the rule specifies a vendorid, it has to match */
@@ -121,10 +150,9 @@ device_matches_rule(rule_t *rule, device_t *device)
   if (rule->dev_not_type != 0 &&
       (device->type & rule->dev_not_type))
     return false;
-  printf("device matches rule\n");
 
   /* Everything specified matches, we're good */
-  return true;
+  return device_matches_udev_rule(rule, device);
 }
 
 static bool
@@ -134,7 +162,6 @@ vm_matches_rule(rule_t *rule, vm_t *vm)
   if (rule->vm_uuid != NULL &&
       strcmp(rule->vm_uuid, vm->uuid))
     return false;
-  printf("VM matches rule\n");
 
   /* Everything specified matches, we're good */
   return true;
@@ -269,7 +296,6 @@ policy_is_allowed(device_t *device, vm_t *vm)
   list_for_each(pos, &rules.list) {
     rule = list_entry(pos, rule_t, list);
     /* First match wins (or looses), ALWAYS implies ALLOW */
-    xd_log(LOG_ERR, "%s\n", rule->vm_uuid);
     if (device_matches_rule(rule, device) &&
         vm_matches_rule(rule, vm))
       return (rule->cmd != DENY);

@@ -120,16 +120,17 @@ typedef struct {
  * present in the system, and their assigned VM
  */
 typedef struct {
-  struct list_head list; /**< Linux-kernel-style list item */
-  int busid;             /**< Device bus */
-  int devid;             /**< Device ID on the bus */
-  int vendorid;          /**< Device vendor ID */
-  int deviceid;          /**< Device device ID */
-  char *shortname;       /**< Name shown in the UI, usually sysattr["product"] */
-  char *longname;        /**< Longer name shown nowhere I know of, usually sysattr["manufacturer"] */
-  char *sysname;         /**< Name in sysfs */
-  vm_t *vm;              /**< VM currently using the device, or NULL for dom0 */
-  int type;              /**< Type of the device, can be multiple types OR-ed together. see policy.h */
+  struct list_head list;    /**< Linux-kernel-style list item */
+  int busid;                /**< Device bus */
+  int devid;                /**< Device ID on the bus */
+  int vendorid;             /**< Device vendor ID */
+  int deviceid;             /**< Device device ID */
+  char *shortname;          /**< Name shown in the UI, usually sysattr["product"] */
+  char *longname;           /**< Longer name shown nowhere I know of, usually sysattr["manufacturer"] */
+  char *sysname;            /**< Name in sysfs */
+  struct udev_device *udev; /**< A udev handle to the device, in case we need more info */
+  vm_t *vm;                 /**< VM currently using the device, or NULL for dom0 */
+  int type;                 /**< Type of the device, can be multiple types OR-ed together. see policy.h */
 } device_t;
 
 typedef struct dominfo
@@ -142,8 +143,8 @@ typedef struct dominfo
 typedef struct usbinfo
 {
   int usb_virtid;
-  int usb_bus;           /**< USB bus in the physical machine */
-  int usb_device;        /**< USB device in the physical machine */
+  int usb_bus;              /**< USB bus in the physical machine */
+  int usb_device;           /**< USB device in the physical machine */
   int usb_vendor;
   int usb_product;
 } usbinfo_t;
@@ -198,7 +199,7 @@ void  udev_fill_devices(void);
 device_t* device_lookup(int busid, int devid);
 device_t* device_lookup_by_attributes(int vendorid, int deviceid, char *serial);
 device_t* device_add(int busid, int devid, int vendorid, int deviceid,
-                     char *shortname, char *longname, char *sysname);
+                     char *shortname, char *longname, char *sysname, struct udev_device *udev);
 int       device_del(int  busid, int  devid);
 char*     device_type(unsigned char class, unsigned char subclass,
                       unsigned char protocol);

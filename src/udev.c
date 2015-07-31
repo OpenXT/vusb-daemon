@@ -339,7 +339,10 @@ udev_maybe_add_device(struct udev_device *dev, int auto_assign)
   }
 
   /* Finally add the device */
-  device = device_add(busnum, devnum, vendorid, deviceid, model, vendor, sysname);
+  device = device_add(busnum, devnum,
+                      vendorid, deviceid,
+                      model, vendor,
+                      sysname, dev);
 
   /* Find out more about the device by looking at its children */
   udev_find_more(dev, device);
@@ -443,7 +446,8 @@ udev_fill_devices(void)
     path = udev_list_entry_get_name(udev_device_entry);
     udev_device = udev_device_new_from_syspath(udev_handle, path);
     udev_maybe_add_device(udev_device, 0);
-    udev_device_unref(udev_device);
+    /* We keep a reference to the udev device, mainly for advanced rule-matching */
+    /* udev_device_unref(udev_device); */
   }
 
   /* Cleanup */
@@ -491,7 +495,8 @@ udev_event(void)
       else
         printf("NOT REMOVED\n");
     }
-    udev_device_unref(dev);
+    /* We keep a reference to the udev device, mainly for advanced rule-matching */
+    /* udev_device_unref(dev); */
   }
   else {
     printf("No Device from receive_device(). An error occured.\n");

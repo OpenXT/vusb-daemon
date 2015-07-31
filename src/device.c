@@ -97,13 +97,10 @@ device_lookup_by_attributes(int vendorid,
  * @return A pointer to the newly created device
  */
 device_t*
-device_add(int  busid,
-           int  devid,
-           int  vendorid,
-           int  deviceid,
-           char *shortname,
-           char *longname,
-           char *sysname)
+device_add(int  busid, int  devid,
+           int  vendorid, int  deviceid,
+           char *shortname, char *longname,
+           char *sysname, struct udev_device *udev)
 {
   device_t *device;
 
@@ -116,6 +113,7 @@ device_add(int  busid,
   device->shortname = shortname;
   device->longname = longname;
   device->sysname = sysname;
+  device->udev = udev;
   device->vm = NULL; /* The UI isn't happy if the device is assigned to dom0 */
   device->type = 0;
   list_add(&device->list, &devices.list);
@@ -149,6 +147,7 @@ device_del(int  busid,
     free(device->shortname);
     free(device->longname);
     free(device->sysname);
+    udev_device_unref(device->udev);
     free(device);
   } else {
     xd_log(LOG_ERR, "Device not found: %d-%d", busid, devid);

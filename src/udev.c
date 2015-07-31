@@ -94,7 +94,7 @@ udev_find_more_about_input(struct udev_device *udev_device,  device_t *device)
 }
 
 static void
-class_to_device(char *class, device_t *device)
+class_to_device(const char *class, device_t *device)
 {
   int c;
 

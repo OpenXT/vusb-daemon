@@ -58,6 +58,8 @@ typedef struct {
   int dev_not_type;      /**< Device forbidden type (none must match) */
   int dev_vendorid;      /**< Device vendorid, or 0 for none */
   int dev_deviceid;      /**< Device deviceid, or 0 for none */
+  char **dev_sysattrs;   /**< List of key value pairs for the udev sysattrs */
+  char **dev_properties; /**< List of key value pairs for the udev properties */
   char *vm_uuid;         /**< VM UUID */
 } rule_t;
 

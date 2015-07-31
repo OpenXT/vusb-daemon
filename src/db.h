@@ -31,6 +31,7 @@
 # define   	DB_H_
 
 #include <stdlib.h>
+#include <stdbool.h>
 #include <malloc.h>
 #include <string.h>
 #include <syslog.h>

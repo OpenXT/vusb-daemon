@@ -39,8 +39,12 @@ vm_gets_devices_when_in_focus(vm_t *vm)
   if (!com_citrix_xenclient_xenmgr_find_vm_by_domid_(g_xcbus, "com.citrix.xenclient.xenmgr", "/", vm->domid, &obj_path))
     return false;
 
-  if (!property_get_com_citrix_xenclient_xenmgr_vm_usb_auto_passthrough_(g_xcbus, "com.citrix.xenclient.xenmgr", obj_path, &v))
+  if (!property_get_com_citrix_xenclient_xenmgr_vm_usb_auto_passthrough_(g_xcbus, "com.citrix.xenclient.xenmgr", obj_path, &v)) {
+    g_free(obj_path);
     return false;
+  }
+
+  g_free(obj_path);
 
   return (v == TRUE) ? true : false;
 }
@@ -50,6 +54,7 @@ dump_rules(void)
 {
   struct list_head *pos;
   rule_t *rule;
+  char **pairs;
 
   printf("----------RULES----------\n");
   list_for_each(pos, &rules.list) {
@@ -60,11 +65,29 @@ dump_rules(void)
       printf("allow\n");
     else if (rule->cmd == DENY)
       printf("deny\n");
-    printf("  pos    %d\n", rule->pos);
-    printf("  desc   \"%s\"\n", rule->desc);
-    printf("  device type=%d type!=%d vendorid=%X deviceid=%X\n",
+    printf("  pos        %d\n", rule->pos);
+    printf("  desc       \"%s\"\n", rule->desc);
+    printf("  device     type=%d type!=%d vendorid=%X deviceid=%X\n",
            rule->dev_type, rule->dev_not_type, rule->dev_vendorid, rule->dev_deviceid);
-    printf("  vm     uuid=%s\n", rule->vm_uuid);
+    pairs = rule->dev_sysattrs;
+    if (pairs != NULL) {
+      printf("  sysattrs  ");
+      while (*pairs != NULL) {
+        printf(" %s=\"%s\"", *pairs, *(pairs + 1));
+        pairs += 2;
+      }
+      printf("\n");
+    }
+    pairs = rule->dev_properties;
+    if (pairs != NULL) {
+      printf("  properties");
+      while (*pairs != NULL) {
+        printf(" %s=\"%s\"", *pairs, *(pairs + 1));
+        pairs += 2;
+      }
+      printf("\n");
+    }
+    printf("  vm         uuid=%s\n", rule->vm_uuid);
   }
   printf("-------------------------\n");
 }
@@ -163,7 +186,7 @@ policy_set_sticky(int dev)
   new_rule->dev_deviceid = device->deviceid;
   new_rule->vm_uuid = malloc(UUID_LENGTH);
   strcpy(new_rule->vm_uuid, device->vm->uuid);
-  new_rule->desc = malloc(strlen(device->shortname));
+  new_rule->desc = malloc(strlen(device->shortname) + 1);
   strcpy(new_rule->desc, device->shortname);
   list_for_each(pos, &rules.list) {
     rule = list_entry(pos, rule_t, list);

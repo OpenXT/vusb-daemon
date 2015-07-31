@@ -35,12 +35,12 @@
 xcdbus_conn_t *db_xcbus = NULL; /**< A dbus (libxcdbus) handle, initialized by db_init() */
 
 static char*
-parse_value(char *subnode_path, char *key)
+parse_value(char *node_path, char *key)
 {
   char *value;
   char path[128];
 
-  sprintf(path, "%s/%s", subnode_path, key);
+  sprintf(path, "%s/%s", node_path, key);
   if (com_citrix_xenclient_db_read_(db_xcbus, DB, DB_OBJ, path, &value))
     return value;
 
@@ -48,39 +48,75 @@ parse_value(char *subnode_path, char *key)
 }
 
 static void
+add_pair(char *key, char *value, char ***list)
+{
+  char *new_key, *new_value;
+  int size = 0;
+
+  new_key = malloc(strlen(key) + 1);
+  new_value = malloc(strlen(value) + 1);
+  strcpy(new_key, key);
+  strcpy(new_value, value);
+
+  /* Initialize the list if needed */
+  if (*list == NULL)
+  {
+    *list = malloc(sizeof(char*));
+    **list = NULL;
+  }
+  /* Check the size of the list */
+  while (*(*list + size) != NULL)
+    size++;
+
+  /* "size" is the size of the list - 1. Add 2 slots, replace the old
+   * NULL terminator with the key, then add the value and NULL */
+  *list = realloc(*list, (size + 3) * sizeof(char*));
+  *(*list + size) = new_key;
+  *(*list + size + 1) = new_value;
+  *(*list + size + 2) = NULL;
+}
+
+static void
+parse_udev_sysattr_or_property(char *node_path, char *rul, rule_t *res, bool sysattr)
+{
+  char **ru, **ru_list = NULL;
+  char *value;
+  char subnode_path[128];
+
+  sprintf(subnode_path, "%s/%s", node_path, rul);
+  if (com_citrix_xenclient_db_list_(db_xcbus, DB, DB_OBJ, subnode_path, &ru_list)) {
+    ru = ru_list;
+    while (*ru != NULL) {
+      value = parse_value(subnode_path, *ru);
+      if (value != NULL) {
+        if (sysattr)
+          add_pair(*ru, value, &res->dev_sysattrs);
+        else
+          add_pair(*ru, value, &res->dev_properties);
+        g_free(value);
+      }
+      ru++;
+    }
+    g_strfreev(ru_list);
+    ru_list = NULL;
+  }
+}
+
+static void
 parse_device(char *rule_path, char *rule, rule_t *res)
 {
-  char **rul, **ru;
+  char **rul, **rul_list;
   char *value;
-  char node_path[64], subnode_path[64];
+  char node_path[128];
 
   sprintf(node_path, "%s/%s", rule_path, rule);
-  if (com_citrix_xenclient_db_list_(db_xcbus, DB, DB_OBJ, node_path, &rul)) {
+  if (com_citrix_xenclient_db_list_(db_xcbus, DB, DB_OBJ, node_path, &rul_list)) {
+    rul = rul_list;
     while (*rul != NULL) {
       if        (!strcmp(*rul, "sysattr")) {
-        sprintf(subnode_path, "%s/%s", node_path, *rul);
-        if (com_citrix_xenclient_db_list_(db_xcbus, DB, DB_OBJ, subnode_path, &ru)) {
-          while (*ru != NULL) {
-            value = parse_value(subnode_path, *ru);
-            if (value != NULL) {
-              db_log(DB_LOG_WARN, "IGNORING sysattr  %s=%s (not implemented yet)",
-                     *ru, value);
-            }
-            ru++;
-          }
-        }
-      } else if (!strcmp(*rul, "udevparm")) {
-        sprintf(subnode_path, "%s/%s", node_path, *rul);
-        if (com_citrix_xenclient_db_list_(db_xcbus, DB, DB_OBJ, subnode_path, &ru)) {
-          while (*ru != NULL) {
-            value = parse_value(subnode_path, *ru);
-            if (value != NULL) {
-              db_log(DB_LOG_WARN, "IGNORING udevparm %s=%s (not implemented yet)",
-                     *ru, value);
-            }
-            ru++;
-          }
-        }
+        parse_udev_sysattr_or_property(node_path, *rul, res, true);
+      } else if (!strcmp(*rul, "property")) {
+        parse_udev_sysattr_or_property(node_path, *rul, res, false);
       } else if (!strcmp(*rul, "mouse")) {
         value = parse_value(node_path, *rul);
         if (value != NULL) {
@@ -88,6 +124,7 @@ parse_device(char *rule_path, char *rule, rule_t *res)
             res->dev_not_type |= MOUSE;
           else
             res->dev_type |= MOUSE;
+          g_free(value);
         }
       } else if (!strcmp(*rul, "keyboard")) {
         value = parse_value(node_path, *rul);
@@ -96,6 +133,7 @@ parse_device(char *rule_path, char *rule, rule_t *res)
             res->dev_not_type |= KEYBOARD;
           else
             res->dev_type |= KEYBOARD;
+          g_free(value);
         }
       } else if (!strcmp(*rul, "game_controller")) {
         value = parse_value(node_path, *rul);
@@ -104,6 +142,7 @@ parse_device(char *rule_path, char *rule, rule_t *res)
             res->dev_not_type |= GAME_CONTROLLER;
           else
             res->dev_type |= GAME_CONTROLLER;
+          g_free(value);
         }
       } else if (!strcmp(*rul, "mass_storage")) {
         value = parse_value(node_path, *rul);
@@ -112,45 +151,59 @@ parse_device(char *rule_path, char *rule, rule_t *res)
             res->dev_not_type |= MASS_STORAGE;
           else
             res->dev_type |= MASS_STORAGE;
+          g_free(value);
         }
       } else if (!strcmp(*rul, "vendor_id")) {
         value = parse_value(node_path, *rul);
-        if (value != NULL)
+        if (value != NULL) {
           res->dev_vendorid = strtol(value, NULL, 16);
+          g_free(value);
+        }
       } else if (!strcmp(*rul, "device_id")) {
         value = parse_value(node_path, *rul);
-        if (value != NULL)
+        if (value != NULL) {
           res->dev_deviceid = strtol(value, NULL, 16);
+          g_free(value);
+        }
       } else db_log(DB_LOG_ERR, "Unknown Device attribute %s", *rul);
       rul++;
     }
+    g_strfreev(rul_list);
   }
 }
 
 static void
 parse_vm(char *rule_path, char *rule, rule_t *res)
 {
-  char **rul;
-  char node_path[64];
+  char **rul, **rul_list;
+  char *value;
+  char node_path[128];
 
   sprintf(node_path, "%s/%s", rule_path, rule);
-  if (com_citrix_xenclient_db_list_(db_xcbus, DB, DB_OBJ, node_path, &rul)) {
+  if (com_citrix_xenclient_db_list_(db_xcbus, DB, DB_OBJ, node_path, &rul_list)) {
+    rul = rul_list;
     while (*rul != NULL) {
       if (!strcmp(*rul, "uuid")) {
-        res->vm_uuid = parse_value(node_path, *rul);
+        value = parse_value(node_path, *rul);
+        if (value != NULL) {
+          res->vm_uuid = malloc(strlen(value) + 1);
+          strcpy(res->vm_uuid, value);
+          g_free(value);
+        }
       } else {
         db_log(DB_LOG_ERR, "Unknown VM attribute %s", *rul);
       }
       rul++;
     }
+    g_strfreev(rul_list);
   }
 }
 
 static rule_t*
 parse_rule(char *rule_node)
 {
-  char **rule;
-  char rule_path[32];
+  char **rule, **rule_list;
+  char rule_path[64];
   char *value;
   rule_t* res;
 
@@ -158,7 +211,8 @@ parse_rule(char *rule_node)
   memset(res, 0, sizeof(rule_t));
   res->pos = strtol(rule_node, NULL, 10);
   sprintf(rule_path, "/usb-rules/%s", rule_node);
-  if (com_citrix_xenclient_db_list_(db_xcbus, DB, DB_OBJ, rule_path, &rule)) {
+  if (com_citrix_xenclient_db_list_(db_xcbus, DB, DB_OBJ, rule_path, &rule_list)) {
+    rule = rule_list;
     while (*rule != NULL) {
       if        (!strcmp(*rule, "command")) {
         value = parse_value(rule_path, *rule);
@@ -170,9 +224,15 @@ parse_rule(char *rule_node)
           else if (!strcmp(value, "deny"))
             res->cmd = DENY;
           else db_log(DB_LOG_ERR, "Unknown command %s", value);
+          g_free(value);
         }
       } else if (!strcmp(*rule, "description")) {
-        res->desc = parse_value(rule_path, *rule);
+        value = parse_value(rule_path, *rule);
+        if (value != NULL) {
+          res->desc = malloc(strlen(value) + 1);
+          strcpy(res->desc, value);
+          g_free(value);
+        }
       } else if (!strcmp(*rule, "device")) {
         parse_device(rule_path, *rule, res);
       } else if (!strcmp(*rule, "vm")) {
@@ -182,6 +242,7 @@ parse_rule(char *rule_node)
       }
       rule++;
     }
+    g_strfreev(rule_list);
   }
 
   return res;
@@ -207,10 +268,20 @@ add_rule_to_list(rule_t *rules, rule_t *new_rule)
     if (rule->pos > new_rule->pos)
       break;
   }
-  if (rule != NULL && rule->pos > new_rule->pos)
-    list_add(&new_rule->list, &rule->list);
+  if (rule == NULL)
+    /* The list is empty. Adding "new_rule" as the first rule. */
+    list_add(&new_rule->list, &rules->list);
+  else if (rule->pos > new_rule->pos)
+    /* "rule" is the first rule bigger than new_rule. Adding
+     * "new_rule" just before "rule" */
+    /* list_add_tail adds a just before b (yeah, when using a list
+     * node as the head, the function names don't make sense anymore) */
+    list_add_tail(&new_rule->list, &rule->list);
   else
-    list_add_tail(&new_rule->list, &rules->list);
+    /* The new rule is the biggest, adding it after "rule", which is
+     * the last (and biggest) rule in the list */
+    /* list_add adds a just after b */
+    list_add(&new_rule->list, &rule->list);
 }
 
 /**
@@ -235,16 +306,18 @@ db_dbus_init(xcdbus_conn_t *xcbus_conn)
 void
 db_read_policy(rule_t *rules)
 {
-  char **rule_nodes;
+  char **rule_nodes, **rule_nodes_list;
   rule_t *rule;
 
-  if (com_citrix_xenclient_db_list_(db_xcbus, DB, DB_OBJ, "/usb-rules", &rule_nodes)) {
+  if (com_citrix_xenclient_db_list_(db_xcbus, DB, DB_OBJ, "/usb-rules", &rule_nodes_list)) {
+    rule_nodes = rule_nodes_list;
     while (*rule_nodes != NULL) {
       rule = parse_rule(*rule_nodes);
       if (rule != NULL)
         add_rule_to_list(rules, rule);
       rule_nodes++;
     }
+    g_strfreev(rule_nodes_list);
   }
 }
 

@@ -113,11 +113,11 @@ parse_device(char *rule_path, char *rule, rule_t *res)
   if (com_citrix_xenclient_db_list_(db_xcbus, DB, DB_OBJ, node_path, &rul_list)) {
     rul = rul_list;
     while (*rul != NULL) {
-      if        (!strcmp(*rul, "sysattr")) {
+      if        (!strcmp(*rul, NODE_SYSATTR)) {
         parse_udev_sysattr_or_property(node_path, *rul, res, true);
-      } else if (!strcmp(*rul, "property")) {
+      } else if (!strcmp(*rul, NODE_PROPERTY)) {
         parse_udev_sysattr_or_property(node_path, *rul, res, false);
-      } else if (!strcmp(*rul, "mouse")) {
+      } else if (!strcmp(*rul, NODE_MOUSE)) {
         value = parse_value(node_path, *rul);
         if (value != NULL) {
           if (*value == '0')
@@ -126,7 +126,7 @@ parse_device(char *rule_path, char *rule, rule_t *res)
             res->dev_type |= MOUSE;
           g_free(value);
         }
-      } else if (!strcmp(*rul, "keyboard")) {
+      } else if (!strcmp(*rul, NODE_KEYBOARD)) {
         value = parse_value(node_path, *rul);
         if (value != NULL) {
           if (*value == '0')
@@ -135,7 +135,7 @@ parse_device(char *rule_path, char *rule, rule_t *res)
             res->dev_type |= KEYBOARD;
           g_free(value);
         }
-      } else if (!strcmp(*rul, "game_controller")) {
+      } else if (!strcmp(*rul, NODE_GAME_CONTROLLER)) {
         value = parse_value(node_path, *rul);
         if (value != NULL) {
           if (*value == '0')
@@ -144,7 +144,7 @@ parse_device(char *rule_path, char *rule, rule_t *res)
             res->dev_type |= GAME_CONTROLLER;
           g_free(value);
         }
-      } else if (!strcmp(*rul, "mass_storage")) {
+      } else if (!strcmp(*rul, NODE_MASS_STORAGE)) {
         value = parse_value(node_path, *rul);
         if (value != NULL) {
           if (*value == '0')
@@ -153,13 +153,13 @@ parse_device(char *rule_path, char *rule, rule_t *res)
             res->dev_type |= MASS_STORAGE;
           g_free(value);
         }
-      } else if (!strcmp(*rul, "vendor_id")) {
+      } else if (!strcmp(*rul, NODE_VENDOR_ID)) {
         value = parse_value(node_path, *rul);
         if (value != NULL) {
           res->dev_vendorid = strtol(value, NULL, 16);
           g_free(value);
         }
-      } else if (!strcmp(*rul, "device_id")) {
+      } else if (!strcmp(*rul, NODE_DEVICE_ID)) {
         value = parse_value(node_path, *rul);
         if (value != NULL) {
           res->dev_deviceid = strtol(value, NULL, 16);
@@ -183,7 +183,7 @@ parse_vm(char *rule_path, char *rule, rule_t *res)
   if (com_citrix_xenclient_db_list_(db_xcbus, DB, DB_OBJ, node_path, &rul_list)) {
     rul = rul_list;
     while (*rul != NULL) {
-      if (!strcmp(*rul, "uuid")) {
+      if (!strcmp(*rul, NODE_UUID)) {
         value = parse_value(node_path, *rul);
         if (value != NULL) {
           res->vm_uuid = malloc(strlen(value) + 1);
@@ -210,11 +210,11 @@ parse_rule(char *rule_node)
   res = malloc(sizeof(rule_t));
   memset(res, 0, sizeof(rule_t));
   res->pos = strtol(rule_node, NULL, 10);
-  sprintf(rule_path, "/usb-rules/%s", rule_node);
+  sprintf(rule_path, "%s/%s", NODE_RULES, rule_node);
   if (com_citrix_xenclient_db_list_(db_xcbus, DB, DB_OBJ, rule_path, &rule_list)) {
     rule = rule_list;
     while (*rule != NULL) {
-      if        (!strcmp(*rule, "command")) {
+      if        (!strcmp(*rule, NODE_COMMAND)) {
         value = parse_value(rule_path, *rule);
         if (value != NULL) {
           if (!strcmp(value, "always"))
@@ -226,16 +226,16 @@ parse_rule(char *rule_node)
           else db_log(DB_LOG_ERR, "Unknown command %s", value);
           g_free(value);
         }
-      } else if (!strcmp(*rule, "description")) {
+      } else if (!strcmp(*rule, NODE_DESCRIPTION)) {
         value = parse_value(rule_path, *rule);
         if (value != NULL) {
           res->desc = malloc(strlen(value) + 1);
           strcpy(res->desc, value);
           g_free(value);
         }
-      } else if (!strcmp(*rule, "device")) {
+      } else if (!strcmp(*rule, NODE_DEVICE)) {
         parse_device(rule_path, *rule, res);
-      } else if (!strcmp(*rule, "vm")) {
+      } else if (!strcmp(*rule, NODE_VM)) {
         parse_vm(rule_path, *rule, res);
       } else {
         db_log(DB_LOG_ERR, "Unknown rule attribute %s", *rule);
@@ -253,7 +253,7 @@ db_write_rule_key(int pos, char *key, char *value)
 {
   char path[128];
 
-  sprintf(path, "/usb-rules/%d/%s", pos, key);
+  sprintf(path, "%s/%d/%s", NODE_RULES, pos, key);
   com_citrix_xenclient_db_write_(db_xcbus, DB, DB_OBJ, path, value);
 }
 
@@ -309,7 +309,7 @@ db_read_policy(rule_t *rules)
   char **rule_nodes, **rule_nodes_list;
   rule_t *rule;
 
-  if (com_citrix_xenclient_db_list_(db_xcbus, DB, DB_OBJ, "/usb-rules", &rule_nodes_list)) {
+  if (com_citrix_xenclient_db_list_(db_xcbus, DB, DB_OBJ, NODE_RULES, &rule_nodes_list)) {
     rule_nodes = rule_nodes_list;
     while (*rule_nodes != NULL) {
       rule = parse_rule(*rule_nodes);
@@ -333,47 +333,47 @@ db_write_policy(rule_t *rules)
   rule_t *rule = NULL;
   char value[5];
 
-  com_citrix_xenclient_db_rm_(db_xcbus, DB, DB_OBJ, "/usb-rules");
+  com_citrix_xenclient_db_rm_(db_xcbus, DB, DB_OBJ, NODE_RULES);
 
   list_for_each(pos, &rules->list) {
     rule = list_entry(pos, rule_t, list);
     if (rule->desc != NULL)
-      db_write_rule_key(rule->pos, "description", rule->desc);
+      db_write_rule_key(rule->pos, NODE_DESCRIPTION, rule->desc);
     if (rule->cmd == ALWAYS)
-      db_write_rule_key(rule->pos, "command", "always");
+      db_write_rule_key(rule->pos, NODE_COMMAND, "always");
     else if (rule->cmd == ALLOW)
-      db_write_rule_key(rule->pos, "command", "allow");
+      db_write_rule_key(rule->pos, NODE_COMMAND, "allow");
     else if (rule->cmd == DENY)
-      db_write_rule_key(rule->pos, "command", "deny");
+      db_write_rule_key(rule->pos, NODE_COMMAND, "deny");
     if (rule->dev_type != 0) {
       if (rule->dev_type & KEYBOARD)
-        db_write_rule_key(rule->pos, "device/keyboard", "1");
+        db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_KEYBOARD, "1");
       if (rule->dev_type & MOUSE)
-        db_write_rule_key(rule->pos, "device/mouse", "1");
+        db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_MOUSE, "1");
       if (rule->dev_type & GAME_CONTROLLER)
-        db_write_rule_key(rule->pos, "device/game_controller", "1");
+        db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_GAME_CONTROLLER, "1");
       if (rule->dev_type & MASS_STORAGE)
-        db_write_rule_key(rule->pos, "device/mass_storage", "1");
+        db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_MASS_STORAGE, "1");
     }
     if (rule->dev_not_type != 0) {
       if (rule->dev_not_type & KEYBOARD)
-        db_write_rule_key(rule->pos, "device/keyboard", "0");
+        db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_KEYBOARD, "0");
       if (rule->dev_not_type & MOUSE)
-        db_write_rule_key(rule->pos, "device/mouse", "0");
+        db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_MOUSE, "0");
       if (rule->dev_not_type & GAME_CONTROLLER)
-        db_write_rule_key(rule->pos, "device/game_controller", "0");
+        db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_GAME_CONTROLLER, "0");
       if (rule->dev_not_type & MASS_STORAGE)
-        db_write_rule_key(rule->pos, "device/mass_storage", "0");
+        db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_MASS_STORAGE, "0");
     }
     if (rule->dev_vendorid != 0) {
       sprintf(value, "%04X", rule->dev_vendorid);
-      db_write_rule_key(rule->pos, "device/vendor_id", value);
+      db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_VENDOR_ID, value);
     }
     if (rule->dev_deviceid != 0) {
       sprintf(value, "%04X", rule->dev_deviceid);
-      db_write_rule_key(rule->pos, "device/device_id", value);
+      db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_DEVICE_ID, value);
     }
     if (rule->vm_uuid != NULL)
-      db_write_rule_key(rule->pos, "vm/uuid", rule->vm_uuid);
+      db_write_rule_key(rule->pos, NODE_VM "/" NODE_UUID, rule->vm_uuid);
   }
 }

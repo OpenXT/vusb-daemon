@@ -42,6 +42,22 @@
 #define DB          "com.citrix.xenclient.db"
 #define DB_OBJ      "/"
 
+#define NODE_RULES      "/usb-rules"
+/*                        "<rule number>" */
+#define NODE_DEVICE         "device"
+#define NODE_COMMAND          "command"
+#define NODE_DESCRIPTION      "description"
+#define NODE_KEYBOARD         "keyboard"
+#define NODE_MOUSE            "mouse"
+#define NODE_GAME_CONTROLLER  "game_controller"
+#define NODE_MASS_STORAGE     "mass_storage"
+#define NODE_VENDOR_ID        "vendor_id"
+#define NODE_DEVICE_ID        "device_id"
+#define NODE_SYSATTR          "sysattr"
+#define NODE_PROPERTY         "property"
+#define NODE_VM             "vm"
+#define NODE_UUID             "uuid"
+
 void db_dbus_init(xcdbus_conn_t *xcbus_conn);
 void db_read_policy(rule_t *rules);
 void db_write_policy(rule_t *rules);

@@ -44,9 +44,9 @@
 
 #define NODE_RULES      "/usb-rules"
 /*                        "<rule number>" */
+#define NODE_COMMAND        "command"
+#define NODE_DESCRIPTION    "description"
 #define NODE_DEVICE         "device"
-#define NODE_COMMAND          "command"
-#define NODE_DESCRIPTION      "description"
 #define NODE_KEYBOARD         "keyboard"
 #define NODE_MOUSE            "mouse"
 #define NODE_GAME_CONTROLLER  "game_controller"

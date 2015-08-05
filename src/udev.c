@@ -563,13 +563,14 @@ udev_event(void)
         printf("   MassStorage: %d\n", !!(device->type & MASS_STORAGE));
         printf("   Optical: %d\n", !!(device->type & OPTICAL));
         printf("ADDED\n");
+        /* We keep a reference to the udev device, mainly for advanced rule-matching */
+        /* udev_device_unref(dev); */
       } else {
         /* This seems to happen when a device is quickly plugged and
          * unplugged. */
         printf("NOT ADDED\n");
+        udev_device_unref(dev);
       }
-      /* We keep a reference to the udev device, mainly for advanced rule-matching */
-      /* udev_device_unref(dev); */
     }
     if (!strcmp(action, "remove")) {
       if (udev_del_device(dev) == 0)

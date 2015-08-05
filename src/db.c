@@ -153,6 +153,15 @@ parse_device(char *rule_path, char *rule, rule_t *res)
             res->dev_type |= MASS_STORAGE;
           g_free(value);
         }
+      } else if (!strcmp(*rul, NODE_OPTICAL)) {
+        value = parse_value(node_path, *rul);
+        if (value != NULL) {
+          if (*value == '0')
+            res->dev_not_type |= OPTICAL;
+          else
+            res->dev_type |= OPTICAL;
+          g_free(value);
+        }
       } else if (!strcmp(*rul, NODE_VENDOR_ID)) {
         value = parse_value(node_path, *rul);
         if (value != NULL) {
@@ -354,6 +363,8 @@ db_write_policy(rule_t *rules)
         db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_GAME_CONTROLLER, "1");
       if (rule->dev_type & MASS_STORAGE)
         db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_MASS_STORAGE, "1");
+      if (rule->dev_type & OPTICAL)
+        db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_OPTICAL, "1");
     }
     if (rule->dev_not_type != 0) {
       if (rule->dev_not_type & KEYBOARD)

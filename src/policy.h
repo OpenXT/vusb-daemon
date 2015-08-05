@@ -43,6 +43,7 @@ enum command {
 #define MOUSE           0x2     /**< Mouse device type */
 #define GAME_CONTROLLER 0x4     /**< Game controller device type */
 #define MASS_STORAGE    0x8     /**< Mass storage device type */
+#define OPTICAL         0x10    /**< Optical (cd-rom) device type */
 
 /**
  * @brief Policy rule structure

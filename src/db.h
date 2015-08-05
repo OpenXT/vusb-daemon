@@ -51,6 +51,7 @@
 #define NODE_MOUSE            "mouse"
 #define NODE_GAME_CONTROLLER  "game_controller"
 #define NODE_MASS_STORAGE     "mass_storage"
+#define NODE_OPTICAL          "optical"
 #define NODE_VENDOR_ID        "vendor_id"
 #define NODE_DEVICE_ID        "device_id"
 #define NODE_SYSATTR          "sysattr"

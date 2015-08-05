@@ -59,6 +59,34 @@ udev_init(void)
   return fd;
 }
 
+/* Let's do our best to make sure device are properly created */
+static void
+udev_settle(void)
+{
+  struct udev_queue *queue;
+  unsigned int i;
+
+  queue = udev_queue_new(udev_handle);
+  if (!queue) {
+    xd_log(LOG_WARN, "udev_queue_new failed");
+    /* We failed to get a queue, let's just sleep 0.1 seconds,
+       it's usually enough the get udev settled... */
+    usleep(100000);
+    return;
+  }
+
+  for (i = 0; i < 10; ++i) {
+    if (udev_queue_get_queue_is_empty(queue)) {
+      break;
+    }
+    xd_log(LOG_INFO, "udev queue is not empty, retrying for %f seconds...", 0.5 - i * 0.05);
+    /* Sleep for 0.05 seconds 10 times before giving up */
+    usleep(50000);
+  }
+
+  udev_queue_unref(queue);
+}
+
 static void
 udev_find_more_about_input(struct udev_device *udev_device,  device_t *device)
 {
@@ -119,11 +147,90 @@ udev_find_more_about_class(struct udev_device *udev_device,  device_t *device)
 }
 
 /**
+ * This is a tricky one. At this point, for some reason and even if we
+ * did a "settle", udev cdrom device information is not fully
+ * populated. So we try to wait until it is.
+ * This sucks for USB flash drives, because they are scsi devices too,
+ * so they'll get probed too for nothing... Maybe in the future we can
+ * gather advanced info about them here, for super-advanced filtering!
+ */
+static void
+udev_find_more_about_optical(struct udev_device *udev_device,  device_t *device, int new)
+{
+  struct udev_monitor *mon;
+  struct timeval tv;
+  int fd;
+  struct udev_device *udev_child;
+  struct udev_enumerate *enumerate;
+  struct udev_list_entry *udev_device_list, *udev_device_entry;
+  const char *path;
+  const char *value;
+  fd_set fds;
+
+  /* Optical drives are probed in multiple udev passes...
+   * For every scsi devices, wait for a second udev pass */
+
+  /* If the device is already an optical drive we're good */
+  if (device->type & OPTICAL)
+    return;
+
+  /* Check if the device is scsi */
+  value = udev_device_get_devtype(udev_device);
+  if (value == NULL || strcmp(value, "scsi_host")) {
+    return;
+  }
+
+  /* If the device didn't just appear, we can assume everything is ready */
+  if (!new) {
+    value = udev_device_get_property_value(udev_device, "ID_CDROM");
+    if (value != NULL && *value != '0')
+      device->type |= OPTICAL;
+    return;
+  }
+
+  /* Create a udev monitor to wait for some "block" action for 3 seconds */
+  mon = udev_monitor_new_from_netlink(udev_handle, "udev");
+  udev_monitor_filter_add_match_subsystem_devtype(mon, "block", "disk");
+  udev_monitor_enable_receiving(mon);
+  fd = udev_monitor_get_fd(mon);
+  FD_ZERO(&fds);
+  FD_SET(fd, &fds);
+  tv.tv_sec = 3;
+  tv.tv_usec = 0;
+  select(fd + 1, &fds, NULL, NULL, &tv);
+  udev_monitor_unref(mon);
+
+  /* The block device may just have appeared, let udev settle (again...) */
+  udev_settle();
+
+  /* Wether the previous triggered or timed out, check out our subnodes */
+  enumerate = udev_enumerate_new(udev_handle);
+  udev_enumerate_add_match_parent(enumerate, udev_device);
+  udev_enumerate_scan_devices(enumerate);
+  udev_device_list = udev_enumerate_get_list_entry(enumerate);
+  udev_list_entry_foreach(udev_device_entry, udev_device_list) {
+    path = udev_list_entry_get_name(udev_device_entry);
+    udev_child = udev_device_new_from_syspath(udev_handle, path);
+    value = udev_device_get_property_value(udev_child, "ID_CDROM");
+    if (value != NULL) {
+      if (*value != '0')
+        device->type |= OPTICAL;
+      udev_device_unref(udev_child);
+      break;
+    }
+    udev_device_unref(udev_child);
+  }
+
+  /* Cleanup */
+  udev_enumerate_unref(enumerate);
+}
+
+/**
  * Look at all the childs of a given device to figure out more about
  * what it does
  */
 static void
-udev_find_more(struct udev_device *dev, device_t *device)
+udev_find_more(struct udev_device *dev, device_t *device, int new)
 {
   struct udev_enumerate *enumerate;
   struct udev_list_entry *udev_device_list, *udev_device_entry;
@@ -139,6 +246,7 @@ udev_find_more(struct udev_device *dev, device_t *device)
     udev_device = udev_device_new_from_syspath(udev_handle, path);
     udev_find_more_about_input(udev_device, device);
     udev_find_more_about_class(udev_device, device);
+    udev_find_more_about_optical(udev_device, device, new);
     udev_device_unref(udev_device);
   }
 
@@ -184,35 +292,6 @@ check_product(const char *s)
 
   return -1;
 }
-
-/* Let's do our best to make sure device are properly created */
-static void
-udev_settle(void)
-{
-  struct udev_queue *queue;
-  unsigned int i;
-
-  queue = udev_queue_new(udev_handle);
-  if (!queue) {
-    xd_log(LOG_WARN, "udev_queue_new failed");
-    /* We failed to get a queue, let's just sleep 0.1 seconds,
-       it's usually enough the get udev settled... */
-    usleep(100000);
-    return;
-  }
-
-  for (i = 0; i < 10; ++i) {
-    if (udev_queue_get_queue_is_empty(queue)) {
-      break;
-    }
-    xd_log(LOG_INFO, "udev queue is not empty, retrying for %f seconds...", 0.5 - i * 0.05);
-    /* Sleep for 0.05 seconds 10 times before giving up */
-    usleep(50000);
-  }
-
-  udev_queue_unref(queue);
-}
-
 
 static device_t*
 udev_maybe_add_device(struct udev_device *dev, int auto_assign)
@@ -345,7 +424,7 @@ udev_maybe_add_device(struct udev_device *dev, int auto_assign)
                       sysname, dev);
 
   /* Find out more about the device by looking at its children */
-  udev_find_more(dev, device);
+  udev_find_more(dev, device, auto_assign);
 
   if (auto_assign > 0)
     policy_auto_assign_new_device(device);
@@ -482,21 +561,23 @@ udev_event(void)
         printf("   Keyboard: %d\n", !!(device->type & KEYBOARD));
         printf("   Joystick: %d\n", !!(device->type & GAME_CONTROLLER));
         printf("   MassStorage: %d\n", !!(device->type & MASS_STORAGE));
+        printf("   Optical: %d\n", !!(device->type & OPTICAL));
         printf("ADDED\n");
       } else {
         /* This seems to happen when a device is quickly plugged and
          * unplugged. */
         printf("NOT ADDED\n");
       }
+      /* We keep a reference to the udev device, mainly for advanced rule-matching */
+      /* udev_device_unref(dev); */
     }
     if (!strcmp(action, "remove")) {
       if (udev_del_device(dev) == 0)
         printf("REMOVED\n");
       else
         printf("NOT REMOVED\n");
+      udev_device_unref(dev);
     }
-    /* We keep a reference to the udev device, mainly for advanced rule-matching */
-    /* udev_device_unref(dev); */
   }
   else {
     printf("No Device from receive_device(). An error occured.\n");

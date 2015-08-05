@@ -105,7 +105,7 @@ vm_focused(void)
 static bool
 device_matches_udev_rule(rule_t *rule, device_t *device)
 {
-  char *value;
+  const char *value;
   char **pairs;
 
   if (rule->dev_sysattrs != NULL) {

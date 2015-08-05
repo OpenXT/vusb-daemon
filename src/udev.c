@@ -422,6 +422,8 @@ udev_maybe_add_device(struct udev_device *dev, int auto_assign)
                       vendorid, deviceid,
                       model, vendor,
                       sysname, dev);
+  if (device == NULL)
+    return NULL;
 
   /* Find out more about the device by looking at its children */
   udev_find_more(dev, device, auto_assign);
@@ -548,12 +550,13 @@ udev_event(void)
   dev = udev_monitor_receive_device(udev_mon);
   if (dev) {
     action = udev_device_get_action(dev);
-    printf("Got Device\n");
-    printf("   Node: %s\n", udev_device_get_devnode(dev));
-    printf("   Subsystem: %s\n", udev_device_get_subsystem(dev));
-    printf("   Sysname: %s\n", udev_device_get_sysname(dev));
-    printf("   Devtype: %s\n", udev_device_get_devtype(dev));
-    printf("   Action: %s\n", action);
+    xd_log(LOG_INFO, "Got Device");
+    xd_log(LOG_INFO, "   Node: %s", udev_device_get_devnode(dev));
+    xd_log(LOG_INFO, "   Path: %s", udev_device_get_devpath(dev));
+    xd_log(LOG_INFO, "   Subsystem: %s", udev_device_get_subsystem(dev));
+    xd_log(LOG_INFO, "   Sysname: %s", udev_device_get_sysname(dev));
+    xd_log(LOG_INFO, "   Devtype: %s", udev_device_get_devtype(dev));
+    xd_log(LOG_INFO, "   Action: %s", action);
     if (!strcmp(action, "add")) {
       device = udev_maybe_add_device(dev, 1);
       if (device != NULL) {

@@ -102,7 +102,16 @@ device_add(int  busid, int  devid,
            char *shortname, char *longname,
            char *sysname, struct udev_device *udev)
 {
+  struct list_head *pos;
   device_t *device;
+
+  /* Fail if we already have the device */
+  list_for_each(pos, &devices.list) {
+    device = list_entry(pos, device_t, list);
+    if (device->busid == busid && device->devid == devid) {
+      return NULL;
+    }
+  }
 
   device = malloc(sizeof(device_t));
 

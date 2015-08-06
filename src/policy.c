@@ -97,7 +97,7 @@ vm_focused(void)
 {
   int domid;
 
-  xcdbus_input_get_focus_domid(g_xcbus, &domid);
+  com_citrix_xenclient_input_get_focus_domid_(g_xcbus, INPUT, INPUT_OBJ, &domid);
 
   return vm_lookup(domid);
 }
@@ -330,7 +330,7 @@ policy_auto_assign_new_device(device_t *device)
   } else {
     if (vm == NULL) {
       vm = vm_focused();
-      if (!vm_gets_devices_when_in_focus(vm))
+      if (vm != NULL && !vm_gets_devices_when_in_focus(vm))
         vm = NULL;
     }
   }

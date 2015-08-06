@@ -94,8 +94,11 @@
 #define UIVM_UUID   "00000000-0000-0000-0000-000000000001" /**< UIVM's UUID */
 #define UIVM_PATH   "/vm/00000000_0000_0000_0000_000000000001" /**< UIVM's xenstore path */
 
-#define XENMGR      "com.citrix.xenclient.xenmgr" /**< The dbus name of xenmgr*/
-#define XENMGR_OBJ  "/"                           /**< The main dbus object of xenmgr*/
+#define XENMGR      "com.citrix.xenclient.xenmgr" /**< The dbus name of xenmgr */
+#define XENMGR_OBJ  "/"                           /**< The main dbus object of xenmgr */
+
+#define INPUT       "com.citrix.xenclient.input"  /**< The dbus name of input */
+#define INPUT_OBJ   "/"                           /**< The main dbus object of input */
 
 /**
  * The (stupid) logging macro

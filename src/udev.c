@@ -526,9 +526,10 @@ udev_fill_devices(void)
   udev_list_entry_foreach(udev_device_entry, udev_device_list) {
     path = udev_list_entry_get_name(udev_device_entry);
     udev_device = udev_device_new_from_syspath(udev_handle, path);
-    udev_maybe_add_device(udev_device, 0);
-    /* We keep a reference to the udev device, mainly for advanced rule-matching */
-    /* udev_device_unref(udev_device); */
+    if (udev_maybe_add_device(udev_device, 0) == NULL)
+      udev_device_unref(udev_device);
+    else
+      ;/* We keep a reference to the udev device, mainly for advanced rule-matching */
   }
 
   /* Cleanup */

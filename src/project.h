@@ -103,7 +103,7 @@
 /**
  * The (stupid) logging macro
  */
-#define xd_log(I, ...) { fprintf(stderr, ##__VA_ARGS__); fprintf(stderr, "\n"); }
+#define xd_log(I, ...) do { fprintf(stderr, ##__VA_ARGS__); fprintf(stderr, "\n"); } while (0)
 
 /**
  * @brief VM structure

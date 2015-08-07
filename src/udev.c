@@ -47,7 +47,7 @@ udev_init(void)
   udev_handle = udev_new();
   if(udev_handle == NULL)
   {
-    printf("Can't create udev handle");
+    xd_log(LOG_INFO, "Can't create udev handle");
     return -1;
   }
 
@@ -561,30 +561,30 @@ udev_event(void)
     if (!strcmp(action, "add")) {
       device = udev_maybe_add_device(dev, 1);
       if (device != NULL) {
-        printf("   Mouse: %d\n", !!(device->type & MOUSE));
-        printf("   Keyboard: %d\n", !!(device->type & KEYBOARD));
-        printf("   Joystick: %d\n", !!(device->type & GAME_CONTROLLER));
-        printf("   MassStorage: %d\n", !!(device->type & MASS_STORAGE));
-        printf("   Optical: %d\n", !!(device->type & OPTICAL));
-        printf("ADDED\n");
+        xd_log(LOG_INFO, "   Mouse: %d", !!(device->type & MOUSE));
+        xd_log(LOG_INFO, "   Keyboard: %d", !!(device->type & KEYBOARD));
+        xd_log(LOG_INFO, "   Joystick: %d", !!(device->type & GAME_CONTROLLER));
+        xd_log(LOG_INFO, "   MassStorage: %d", !!(device->type & MASS_STORAGE));
+        xd_log(LOG_INFO, "   Optical: %d", !!(device->type & OPTICAL));
+        xd_log(LOG_INFO, "ADDED");
         /* We keep a reference to the udev device, mainly for advanced rule-matching */
         /* udev_device_unref(dev); */
       } else {
         /* This seems to happen when a device is quickly plugged and
          * unplugged. */
-        printf("NOT ADDED\n");
+        xd_log(LOG_INFO, "NOT ADDED");
         udev_device_unref(dev);
       }
     }
     if (!strcmp(action, "remove")) {
       if (udev_del_device(dev) == 0)
-        printf("REMOVED\n");
+        xd_log(LOG_INFO, "REMOVED");
       else
-        printf("NOT REMOVED\n");
+        xd_log(LOG_INFO, "NOT REMOVED");
       udev_device_unref(dev);
     }
   }
   else {
-    printf("No Device from receive_device(). An error occured.\n");
+    xd_log(LOG_INFO, "No Device from receive_device(). An error occured.");
   }
 }

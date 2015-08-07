@@ -130,8 +130,8 @@ get_usbinfo(int bus, int dev, usbinfo_t *ui)
 static void
 dump_dev(usbinfo_t *ui)
 {
-  printf("bus %d device %d vendor %04x product %04x virtid %06x\n", ui->usb_bus, ui->usb_device,
-         ui->usb_vendor, ui->usb_product, ui->usb_virtid);
+  xd_log(LOG_INFO, "bus %d device %d vendor %04x product %04x virtid %06x",
+         ui->usb_bus, ui->usb_device, ui->usb_vendor, ui->usb_product, ui->usb_virtid);
 }
 
 /**

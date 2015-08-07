@@ -244,7 +244,7 @@ xenstore_list_domain_devs(dominfo_t *domp)
       char *bepath = xenstore_dev_bepath(domp, "vusb", virtid);
       char *online = xenstore_get_keyval(bepath, "online");
       if (online && !strcmp(online, "1"))
-        printf("%d %d\n", bus, dev);
+        xd_log(LOG_INFO, "%d %d", bus, dev);
       free(online);
       free(bepath);
     }

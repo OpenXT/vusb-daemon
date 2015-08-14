@@ -528,8 +528,8 @@ udev_fill_devices(void)
     udev_device = udev_device_new_from_syspath(udev_handle, path);
     if (udev_maybe_add_device(udev_device, 0) == NULL)
       udev_device_unref(udev_device);
-    else
-      ;/* We keep a reference to the udev device, mainly for advanced rule-matching */
+    /* Otherwise we keep a reference to the udev device, mainly for
+     * advanced rule-matching purposes */
   }
 
   /* Cleanup */

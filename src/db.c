@@ -40,7 +40,7 @@ parse_value(char *node_path, char *key)
   char *value;
   char path[128];
 
-  sprintf(path, "%s/%s", node_path, key);
+  snprintf(path, 128, "%s/%s", node_path, key);
   if (com_citrix_xenclient_db_read_(db_xcbus, DB, DB_OBJ, path, &value))
     return value;
 
@@ -83,7 +83,7 @@ parse_udev_sysattr_or_property(char *node_path, char *rul, rule_t *res, bool sys
   char *value;
   char subnode_path[128];
 
-  sprintf(subnode_path, "%s/%s", node_path, rul);
+  snprintf(subnode_path, 128, "%s/%s", node_path, rul);
   if (com_citrix_xenclient_db_list_(db_xcbus, DB, DB_OBJ, subnode_path, &ru_list)) {
     ru = ru_list;
     while (*ru != NULL) {
@@ -109,7 +109,7 @@ parse_device(char *rule_path, char *rule, rule_t *res)
   char *value;
   char node_path[128];
 
-  sprintf(node_path, "%s/%s", rule_path, rule);
+  snprintf(node_path, 128, "%s/%s", rule_path, rule);
   if (com_citrix_xenclient_db_list_(db_xcbus, DB, DB_OBJ, node_path, &rul_list)) {
     rul = rul_list;
     while (*rul != NULL) {
@@ -188,7 +188,7 @@ parse_vm(char *rule_path, char *rule, rule_t *res)
   char *value;
   char node_path[128];
 
-  sprintf(node_path, "%s/%s", rule_path, rule);
+  snprintf(node_path, 128, "%s/%s", rule_path, rule);
   if (com_citrix_xenclient_db_list_(db_xcbus, DB, DB_OBJ, node_path, &rul_list)) {
     rul = rul_list;
     while (*rul != NULL) {
@@ -219,7 +219,7 @@ parse_rule(char *rule_node)
   res = malloc(sizeof(rule_t));
   memset(res, 0, sizeof(rule_t));
   res->pos = strtol(rule_node, NULL, 10);
-  sprintf(rule_path, "%s/%s", NODE_RULES, rule_node);
+  snprintf(rule_path, 64, "%s/%s", NODE_RULES, rule_node);
   if (com_citrix_xenclient_db_list_(db_xcbus, DB, DB_OBJ, rule_path, &rule_list)) {
     rule = rule_list;
     while (*rule != NULL) {
@@ -262,7 +262,7 @@ db_write_rule_key(int pos, char *key, char *value)
 {
   char path[128];
 
-  sprintf(path, "%s/%d/%s", NODE_RULES, pos, key);
+  snprintf(path, 128, "%s/%d/%s", NODE_RULES, pos, key);
   com_citrix_xenclient_db_write_(db_xcbus, DB, DB_OBJ, path, value);
 }
 
@@ -377,11 +377,11 @@ db_write_policy(rule_t *rules)
         db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_MASS_STORAGE, "0");
     }
     if (rule->dev_vendorid != 0) {
-      sprintf(value, "%04X", rule->dev_vendorid);
+      snprintf(value, 5, "%04X", rule->dev_vendorid);
       db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_VENDOR_ID, value);
     }
     if (rule->dev_deviceid != 0) {
-      sprintf(value, "%04X", rule->dev_deviceid);
+      snprintf(value, 5, "%04X", rule->dev_deviceid);
       db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_DEVICE_ID, value);
     }
     if (rule->vm_uuid != NULL)

@@ -393,7 +393,7 @@ policy_auto_assign_devices_to_new_vm(vm_t *vm)
           /* The device is not assigned, as expected, plug it to its VM */
           /* No need to check the policy, ALWAYS implies ALLOW */
           device->vm = vm;
-          ret |= usbowls_plug_device(vm->domid, device->busid, device->devid);
+          ret |= -usbowls_plug_device(vm->domid, device->busid, device->devid);
         }
       }
     }

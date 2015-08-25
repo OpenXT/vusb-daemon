@@ -1,0 +1,5 @@
+config.h
+config.h.in
+*.o
+stamp-h1
+vusb-daemon

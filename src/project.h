@@ -232,5 +232,6 @@ int   policy_unset_sticky(int dev);
 char* policy_get_sticky_uuid(int dev);
 int   policy_auto_assign_new_device(device_t *device);
 int   policy_auto_assign_devices_to_new_vm(vm_t *vm);
+void  policy_reload_from_db(void);
 
 #endif

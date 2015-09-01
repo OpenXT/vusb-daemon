@@ -402,6 +402,51 @@ policy_auto_assign_devices_to_new_vm(vm_t *vm)
   return ret;
 }
 
+static void
+policy_flush_pairs(char ***list)
+{
+  char **s;
+
+  if (*list == NULL)
+    /* The list is empty */
+    return;
+
+  s = *list;
+  while (*s != NULL) {
+    free(*s);
+    s++;
+  }
+  free(*list);
+}
+
+static void
+policy_flush_rules(void)
+{
+  struct list_head *pos, *tmp;
+  rule_t *rule;
+
+  list_for_each_safe(pos, tmp, &rules.list) {
+    rule = list_entry(pos, rule_t, list);
+    list_del(pos);
+    free(rule->desc);
+    policy_flush_pairs(&rule->dev_sysattrs);
+    policy_flush_pairs(&rule->dev_properties);
+    free(rule->vm_uuid);
+    free(rule);
+  }
+}
+
+/**
+ * Empty the list of rules and re-read it from the database.
+ * Call this whenever the policy gets modified outside of this daemon.
+ */
+void
+policy_reload_from_db(void)
+{
+  policy_flush_rules();
+  db_read_policy(&rules);
+}
+
 /**
  * Initialize the policy bits
  *

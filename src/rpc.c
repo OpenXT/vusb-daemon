@@ -416,14 +416,21 @@ gboolean ctxusb_daemon_set_sticky(CtxusbDaemonObject *this,
   return TRUE;
 }
 
+gboolean ctxusb_daemon_name_device(CtxusbDaemonObject *this,
+                                   gint IN_dev_id, const char* IN_name, GError **error)
+{
+  return TRUE;
+}
+
 gboolean ctxusb_daemon_state(CtxusbDaemonObject *this,
                              char **OUT_state, GError **error)
 {
   return TRUE;
 }
 
-gboolean ctxusb_daemon_name_device(CtxusbDaemonObject *this,
-                                   gint IN_dev_id, const char* IN_name, GError **error)
+gboolean ctxusb_daemon_reload_policy(CtxusbDaemonObject *this, GError** error)
 {
+  policy_reload_from_db();
+
   return TRUE;
 }

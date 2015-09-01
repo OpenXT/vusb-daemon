@@ -107,6 +107,7 @@ parse_device(char *rule_path, char *rule, rule_t *res)
 {
   char **rul, **rul_list;
   char *value;
+  char *serial = NULL;
   char node_path[128];
 
   snprintf(node_path, 128, "%s/%s", rule_path, rule);
@@ -172,6 +173,14 @@ parse_device(char *rule_path, char *rule, rule_t *res)
         value = parse_value(node_path, *rul);
         if (value != NULL) {
           res->dev_deviceid = strtol(value, NULL, 16);
+          g_free(value);
+        }
+      } else if (!strcmp(*rul, NODE_SERIAL)) {
+        value = parse_value(node_path, *rul);
+        if (value != NULL) {
+          serial = malloc(strlen(value) + 1);
+          strcpy(serial,value);
+          res->dev_serial = serial;
           g_free(value);
         }
       } else db_log(DB_LOG_ERR, "Unknown Device attribute %s", *rul);
@@ -383,6 +392,9 @@ db_write_policy(rule_t *rules)
     if (rule->dev_deviceid != 0) {
       snprintf(value, 5, "%04X", rule->dev_deviceid);
       db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_DEVICE_ID, value);
+    }
+    if (rule->dev_serial != NULL) {
+      db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_SERIAL, rule->dev_serial);
     }
     if (rule->vm_uuid != NULL)
       db_write_rule_key(rule->pos, NODE_VM "/" NODE_UUID, rule->vm_uuid);

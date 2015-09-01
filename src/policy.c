@@ -67,8 +67,8 @@ dump_rules(void)
       printf("deny\n");
     printf("  pos        %d\n", rule->pos);
     printf("  desc       \"%s\"\n", rule->desc);
-    printf("  device     type=%d type!=%d vendorid=%X deviceid=%X\n",
-           rule->dev_type, rule->dev_not_type, rule->dev_vendorid, rule->dev_deviceid);
+    printf("  device     type=%d type!=%d vendorid=%X deviceid=%X\n serial=%s\n",
+           rule->dev_type, rule->dev_not_type, rule->dev_vendorid, rule->dev_deviceid, rule->dev_serial);
     pairs = rule->dev_sysattrs;
     if (pairs != NULL) {
       printf("  sysattrs  ");
@@ -142,6 +142,16 @@ device_matches_rule(rule_t *rule, device_t *device)
   if (rule->dev_deviceid != 0 &&
       device->deviceid != rule->dev_deviceid)
     return false;
+  /* If the rule specifies a serial, it has to match */
+  if (rule->dev_serial != NULL)
+  {
+    /* If the device does not have a serial, it does not match */
+    if (device->serial == NULL)
+      return false;
+    /* Ensure the rule and device serials match */
+    else if (strcmp(rule->dev_serial,device->serial) != 0)
+      return false;
+  }
   /* device->type must have at least all the bits from rule->dev_type */
   if (rule->dev_type != 0 &&
       (device->type & rule->dev_type) != rule->dev_type)
@@ -211,6 +221,8 @@ policy_set_sticky(int dev)
   new_rule->cmd = ALWAYS;
   new_rule->dev_vendorid = device->vendorid;
   new_rule->dev_deviceid = device->deviceid;
+  if (device->serial != NULL)
+    new_rule->dev_serial = device->serial;
   new_rule->vm_uuid = malloc(UUID_LENGTH);
   strcpy(new_rule->vm_uuid, device->vm->uuid);
   new_rule->desc = malloc(strlen(device->shortname) + 1);
@@ -429,6 +441,7 @@ policy_flush_rules(void)
     rule = list_entry(pos, rule_t, list);
     list_del(pos);
     free(rule->desc);
+    free(rule->dev_serial);
     policy_flush_pairs(&rule->dev_sysattrs);
     policy_flush_pairs(&rule->dev_properties);
     free(rule->vm_uuid);

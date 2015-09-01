@@ -54,6 +54,7 @@
 #define NODE_OPTICAL          "optical"
 #define NODE_VENDOR_ID        "vendor_id"
 #define NODE_DEVICE_ID        "device_id"
+#define NODE_SERIAL           "serial"
 #define NODE_SYSATTR          "sysattr"
 #define NODE_PROPERTY         "property"
 #define NODE_VM             "vm"

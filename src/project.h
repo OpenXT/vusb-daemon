@@ -128,6 +128,7 @@ typedef struct {
   int devid;                /**< Device ID on the bus */
   int vendorid;             /**< Device vendor ID */
   int deviceid;             /**< Device device ID */
+  char *serial;             /**< Device serial number */
   char *shortname;          /**< Name shown in the UI, usually sysattr["product"] */
   char *longname;           /**< Longer name shown nowhere I know of, usually sysattr["manufacturer"] */
   char *sysname;            /**< Name in sysfs */
@@ -201,7 +202,7 @@ void  udev_fill_devices(void);
 
 device_t* device_lookup(int busid, int devid);
 device_t* device_lookup_by_attributes(int vendorid, int deviceid, char *serial);
-device_t* device_add(int busid, int devid, int vendorid, int deviceid,
+device_t* device_add(int busid, int devid, int vendorid, int deviceid, char* serial,
                      char *shortname, char *longname, char *sysname, struct udev_device *udev);
 int       device_del(int  busid, int  devid);
 char*     device_type(unsigned char class, unsigned char subclass,

@@ -299,6 +299,7 @@ udev_maybe_add_device(struct udev_device *dev, int auto_assign)
   const char *value;
   int busnum, devnum;
   int vendorid, deviceid;
+  char *serial = NULL;
   char *vendor = NULL;
   char *model;
   char *sysname = NULL;
@@ -417,9 +418,18 @@ udev_maybe_add_device(struct udev_device *dev, int auto_assign)
     strcpy(model, value);
   }
 
+  /* Look for the serial, if present (may not be). We only care about short serial,
+   * as long serial is often otherwise not unique */
+  value = udev_device_get_sysattr_value(dev, "serial");
+  if (value != NULL ) {
+    serial = malloc(strlen(value) + 1);
+    strcpy(serial, value);
+  }
+
   /* Finally add the device */
   device = device_add(busnum, devnum,
                       vendorid, deviceid,
+                      serial,
                       model, vendor,
                       sysname, dev);
   if (device == NULL)

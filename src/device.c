@@ -75,7 +75,7 @@ device_lookup_by_attributes(int vendorid,
     device = list_entry(pos, device_t, list);
     if (device->vendorid == vendorid &&
         device->deviceid == deviceid &&
-        (serial == NULL || !(strcmp(device->shortname, serial)))) {
+        (serial == NULL || device->serial == NULL || !(strcmp(device->serial, serial)))) {
       return device;
     }
   }
@@ -90,6 +90,7 @@ device_lookup_by_attributes(int vendorid,
  * @param devid The device ID on the bus
  * @param vendorid The device vendor ID
  * @param deviceid The device device ID
+ * @param serial The device serial number (may not be populated on some devices)
  * @param shortname The short description of the device (product name)
  * @param longname The long description of the device (manufacturer)
  * @param sysname The sysfs name of the device
@@ -99,6 +100,7 @@ device_lookup_by_attributes(int vendorid,
 device_t*
 device_add(int  busid, int  devid,
            int  vendorid, int  deviceid,
+           char *serial,
            char *shortname, char *longname,
            char *sysname, struct udev_device *udev)
 {
@@ -119,6 +121,7 @@ device_add(int  busid, int  devid,
   device->devid = devid;
   device->vendorid = vendorid;
   device->deviceid = deviceid;
+  device->serial = serial;
   device->shortname = shortname;
   device->longname = longname;
   device->sysname = sysname;

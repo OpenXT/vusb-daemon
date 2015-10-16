@@ -365,14 +365,19 @@ wait_for_states(char *bepath, char *fepath, enum XenBusStates a, enum XenBusStat
   {
     int bs, fs;
     fd_set set;
+    int len;
+    char **watch_paths;
 
     FD_ZERO(&set);
     FD_SET(fd, &set);
-    /* FIXME: This seems to never block for some reason... */
     if (select(fd + 1, &set, NULL, NULL, &tv) < 0)
       break;
     if (!FD_ISSET(fd, &set))
       continue;
+    /* Read the watch to drain the buffer */
+    watch_paths = xs_read_watch(xs_handle, &len);
+    free(watch_paths);
+
     buf = xs_read(xs_handle, XBT_NULL, bstate, NULL);
     if (buf == NULL) {
       /* The backend tree is gone, probably because the VM got

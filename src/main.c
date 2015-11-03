@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jed Lejosne <lejosnej@ainfosec.com>
+ * Copyright (c) 2015 Assured Information Security, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -32,7 +32,6 @@ static void fill_vms()
 {
   GPtrArray *paths;
   int i;
-  vm_t *vm;
 
   /* Add dom0 to the list of VMs */
   vm_add(DOM0_DOMID, DOM0_UUID);

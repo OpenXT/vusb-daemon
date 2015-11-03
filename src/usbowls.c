@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014 Citrix Systems, Inc.
- * Copyright (c) 2015 Jed Lejosne <lejosnej@ainfosec.com>
+ * Copyright (c) 2015 Assured Information Security, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -127,12 +127,12 @@ get_usbinfo(int bus, int dev, usbinfo_t *ui)
   return -ENOENT;
 }
 
-static void
-dump_dev(usbinfo_t *ui)
-{
-  xd_log(LOG_INFO, "bus %d device %d vendor %04x product %04x virtid %06x",
-         ui->usb_bus, ui->usb_device, ui->usb_vendor, ui->usb_product, ui->usb_virtid);
-}
+/* static void */
+/* dump_dev(usbinfo_t *ui) */
+/* { */
+/*   xd_log(LOG_INFO, "bus %d device %d vendor %04x product %04x virtid %06x", */
+/*          ui->usb_bus, ui->usb_device, ui->usb_vendor, ui->usb_product, ui->usb_virtid); */
+/* } */
 
 /**
  * "Plug" a device to a VM.

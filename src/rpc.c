@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014 Citrix Systems, Inc.
- * Copyright (c) 2015 Jed Lejosne <lejosnej@ainfosec.com>
+ * Copyright (c) 2015 Assured Information Security, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -195,7 +195,7 @@ gboolean ctxusb_daemon_list_devices(CtxusbDaemonObject *this,
 
   list_for_each(pos, &devices.list) {
     device = list_entry(pos, device_t, list);
-    id = makeDeviceId(device->busid, device->devid);
+    id = device_make_id(device->busid, device->devid);
     g_array_append_val(devArray, id);
   }
 
@@ -209,17 +209,17 @@ gboolean ctxusb_daemon_get_device_info(CtxusbDaemonObject *this,
                                        char* *OUT_name, gint *OUT_state, char* *OUT_vm_assigned, char* *OUT_detail, GError **error)
 {
   struct list_head *pos;
-  device_t *device;
+  device_t *device = NULL;
   int busid, devid;
 
-  makeBusDevPair(IN_dev_id, &busid, &devid);
+  device_make_bus_dev_pair(IN_dev_id, &busid, &devid);
   list_for_each(pos, &devices.list) {
     device = list_entry(pos, device_t, list);
     if (device->busid == busid && device->devid == devid) {
       break;
     }
   }
-  if (device->busid != busid || device->devid != devid) {
+  if (device == NULL || device->busid != busid || device->devid != devid) {
     g_set_error(error,
                 DBUS_GERROR,
                 DBUS_GERROR_FAILED,
@@ -274,13 +274,13 @@ gboolean ctxusb_daemon_assign_device(CtxusbDaemonObject *this,
                                      gint IN_dev_id, const char* IN_vm_uuid, GError **error)
 {
   struct list_head *pos;
-  device_t *device;
-  vm_t *vm;
+  device_t *device = NULL;
+  vm_t *vm = NULL;
   char *sticky_uuid;
   int busid, devid;
   int ret;
 
-  makeBusDevPair(IN_dev_id, &busid, &devid);
+  device_make_bus_dev_pair(IN_dev_id, &busid, &devid);
   list_for_each(pos, &devices.list) {
     device = list_entry(pos, device_t, list);
     if (device->busid == busid && device->devid == devid) {
@@ -294,14 +294,14 @@ gboolean ctxusb_daemon_assign_device(CtxusbDaemonObject *this,
     }
   }
 
-  if (device->busid != busid || device->devid != devid) {
+  if (device == NULL || device->busid != busid || device->devid != devid) {
     g_set_error(error,
                 DBUS_GERROR,
                 DBUS_GERROR_FAILED,
                 "Device not found: %d", IN_dev_id);
     return FALSE;
   }
-  if (strncmp(vm->uuid, IN_vm_uuid, UUID_LENGTH)) {
+  if (vm == NULL || strncmp(vm->uuid, IN_vm_uuid, UUID_LENGTH)) {
     g_set_error(error,
                 DBUS_GERROR,
                 DBUS_GERROR_FAILED,
@@ -356,19 +356,19 @@ gboolean ctxusb_daemon_unassign_device(CtxusbDaemonObject *this,
                                        gint IN_dev_id, GError **error)
 {
   struct list_head *pos;
-  device_t *device;
+  device_t *device = NULL;
   int busid, devid;
   int res;
   gboolean ret = TRUE;
 
-  makeBusDevPair(IN_dev_id, &busid, &devid);
+  device_make_bus_dev_pair(IN_dev_id, &busid, &devid);
   list_for_each(pos, &devices.list) {
     device = list_entry(pos, device_t, list);
     if (device->busid == busid && device->devid == devid) {
       break;
     }
   }
-  if (device->busid != busid || device->devid != devid) {
+  if (device == NULL || device->busid != busid || device->devid != devid) {
     g_set_error(error,
                 DBUS_GERROR,
                 DBUS_GERROR_FAILED,

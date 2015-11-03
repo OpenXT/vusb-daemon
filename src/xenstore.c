@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jed Lejosne <lejosnej@ainfosec.com>
+ * Copyright (c) 2015 Assured Information Security, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -114,7 +114,6 @@ xenstore_dom_read(unsigned int domid, const char *format, ...)
   va_list arg;
   char *ret = NULL;
   char *buff = NULL;
-  int res;
 
   domain_path = xs_get_domain_path(xs_handle, domid);
 
@@ -123,9 +122,6 @@ xenstore_dom_read(unsigned int domid, const char *format, ...)
 
   buff = xasprintf("%s/%s", domain_path, format);
   free(domain_path);
-
-  if (res == -1)
-    return NULL;
 
   va_start(arg, format);
   ret = xs_read(xs_handle, XBT_NULL, buff, NULL);
@@ -232,7 +228,7 @@ xenstore_list_domain_devs(dominfo_t *domp)
 {
   char xpath[256], **devs;
   int domid = domp->di_domid;
-  int count,i;
+  unsigned int count, i;
 
   snprintf(xpath, sizeof(xpath), "/local/domain/0/backend/vusb/%d", domid);
   devs = xs_directory(xs_handle, XBT_NULL, xpath, &count);
@@ -347,7 +343,6 @@ wait_for_states(char *bepath, char *fepath, enum XenBusStates a, enum XenBusStat
   char *bstate, *fstate;
   int bstatelen, fstatelen;
   char *buf;
-  int bwatch, fwatch;
   int fd;
   struct timeval tv = { .tv_sec = 5, .tv_usec = 0 };
   int ret = -1;
@@ -358,14 +353,14 @@ wait_for_states(char *bepath, char *fepath, enum XenBusStates a, enum XenBusStat
   fstate = malloc(fstatelen);
   snprintf(bstate, bstatelen, "%s/state", bepath);
   snprintf(fstate, fstatelen, "%s/state", fepath);
-  bwatch = xs_watch(xs_handle, bstate, bstate);
-  fwatch = xs_watch(xs_handle, fstate, fstate);
+  xs_watch(xs_handle, bstate, bstate);
+  xs_watch(xs_handle, fstate, fstate);
   fd = xs_fileno(xs_handle);
   while (tv.tv_sec != 0 || tv.tv_usec != 0)
   {
     int bs, fs;
     fd_set set;
-    int len;
+    unsigned int len;
     char **watch_paths;
 
     FD_ZERO(&set);
@@ -468,7 +463,6 @@ xenstore_destroy_usb(dominfo_t *domp, usbinfo_t *usbp)
   char value[32];
   char *bepath;
   char *fepath;
-  int i;
   int ret;
 
   xd_log(LOG_INFO, "Deleting VUSB node %d for %d.%d",

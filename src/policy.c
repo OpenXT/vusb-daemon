@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jed Lejosne <lejosnej@ainfosec.com>
+ * Copyright (c) 2015 Assured Information Security, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -211,7 +211,7 @@ policy_set_sticky(int dev)
   rule_t *rule = NULL;
   rule_t *new_rule;
 
-  makeBusDevPair(dev, &busid, &devid);
+  device_make_bus_dev_pair(dev, &busid, &devid);
   device = device_lookup(busid, devid);
   if (device == NULL || device->vm == NULL)
     return -1;
@@ -256,7 +256,7 @@ policy_unset_sticky(int dev)
   device_t *device;
   rule_t *rule;
 
-  makeBusDevPair(dev, &busid, &devid);
+  device_make_bus_dev_pair(dev, &busid, &devid);
   device = device_lookup(busid, devid);
   if (device == NULL)
     return -1;
@@ -285,7 +285,7 @@ policy_get_sticky_uuid(int dev)
   device_t *device;
   rule_t *rule;
 
-  makeBusDevPair(dev, &busid, &devid);
+  device_make_bus_dev_pair(dev, &busid, &devid);
   device = device_lookup(busid, devid);
   if (device == NULL)
     return NULL;

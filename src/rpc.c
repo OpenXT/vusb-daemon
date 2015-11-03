@@ -251,17 +251,26 @@ gboolean ctxusb_daemon_get_device_info(CtxusbDaemonObject *this,
     char *uuid = policy_get_sticky_uuid(IN_dev_id);
     if (uuid != NULL) {
       /* But it has an always-assign VM */
-      if (!strncmp(uuid, IN_vm_uuid, UUID_LENGTH))
-        /* Which is IN_vm_uuid */
-        *OUT_state = DEV_STATE_ALWAYS_ONLY;
-      else
-        /* Or not */
-        *OUT_state = DEV_STATE_ASSIGNED;
+      if (device->type | OPTICAL)
+        /* It's a CD drive */
+        *OUT_state = DEV_STATE_CD_ALWAYS;
+      else {
+        if (!strncmp(uuid, IN_vm_uuid, UUID_LENGTH))
+          /* Which is IN_vm_uuid */
+          *OUT_state = DEV_STATE_ALWAYS_ONLY;
+        else
+          /* Or not */
+          *OUT_state = DEV_STATE_ASSIGNED;
+      }
       /* Either way, the assigned VM is this */
       *OUT_vm_assigned = g_strdup(uuid);
     } else {
       /* It doesn't have an always-assign VM, it's all free */
-      *OUT_state = DEV_STATE_UNUSED;
+      if (device->type | OPTICAL)
+        /* Unless it's a CD drive */
+        *OUT_state = DEV_STATE_CD_DOM0;
+      else
+        *OUT_state = DEV_STATE_UNUSED;
       *OUT_vm_assigned = g_strdup("");
     }
   }

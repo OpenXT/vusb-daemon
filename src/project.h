@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jed Lejosne <lejosnej@ainfosec.com>
+ * Copyright (c) 2015 Assured Information Security, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -158,32 +158,6 @@ enum XenBusStates {
   XB_CLOSING, XB_CLOSED
 };
 
-/**
- * @brief Generate a device ID
- *
- * Generate a single ID from the bus and device IDs
- * @param bus_num Device bus
- * @param dev_num Device ID on the bus
- */
-static int makeDeviceId(int bus_num, int dev_num)
-{
-  return ((bus_num - 1) << 7) + (dev_num - 1);
-}
-
-/**
- * @brief Get the bus and device IDs of a device
- *
- * Extract bus and device IDs from a single device ID
- * @param devid   The single ID
- * @param bus_num Resulting device bus
- * @param dev_num Resulting Device ID
- */
-static void makeBusDevPair(int devid, int *bus_num, int *dev_num)
-{
-  *bus_num = (devid >> 7) + 1;
-  *dev_num = (devid & 0x7F) + 1;
-}
-
 struct xs_handle *xs_handle; /**< The global xenstore handle, initialized by xenstore_init() */
 xcdbus_conn_t *g_xcbus;      /**< The global dbus (libxcdbus) handle, initialized by rpc_init() */
 vm_t vms;                    /**< The global list of VMs, handled by vm.c */
@@ -208,7 +182,8 @@ int       device_del(int  busid, int  devid);
 char*     device_type(unsigned char class, unsigned char subclass,
                       unsigned char protocol);
 int       device_unplug_all_from_vm(int domid);
-
+int       device_make_id(int bus_num, int dev_num);
+void      device_make_bus_dev_pair(int devid, int *bus_num, int *dev_num);
 
 vm_t* vm_lookup(const int domid);
 vm_t* vm_lookup_by_uuid(const char *uuid);

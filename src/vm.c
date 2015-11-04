@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jed Lejosne <lejosnej@ainfosec.com>
+ * Copyright (c) 2015 Assured Information Security, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -62,7 +62,7 @@ vm_t*
 vm_lookup_by_uuid(const char *uuid)
 {
   struct list_head *pos;
-  vm_t *vm;
+  vm_t *vm = NULL;
 
   list_for_each(pos, &vms.list) {
     vm = list_entry(pos, vm_t, list);
@@ -71,7 +71,7 @@ vm_lookup_by_uuid(const char *uuid)
     }
   }
 
-  if (!strcmp(vm->uuid, uuid))
+  if (vm != NULL && !strcmp(vm->uuid, uuid))
     return vm;
 
   return NULL;
@@ -145,7 +145,7 @@ int
 vm_del(const int domid)
 {
   struct list_head *pos;
-  vm_t *vm;
+  vm_t *vm = NULL;
 
   list_for_each(pos, &vms.list) {
     vm = list_entry(pos, vm_t, list);
@@ -153,7 +153,7 @@ vm_del(const int domid)
       break;
     }
   }
-  if (vm->domid == domid) {
+  if (vm != NULL && vm->domid == domid) {
     xd_log(LOG_INFO, "Deleting vm, domid=%d, uuid=%s", vm->domid, vm->uuid);
     list_del(pos);
     free(vm->uuid);

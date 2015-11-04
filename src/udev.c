@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jed Lejosne <lejosnej@ainfosec.com>
+ * Copyright (c) 2015 Assured Information Security, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -138,7 +138,6 @@ static void
 udev_find_more_about_class(struct udev_device *udev_device,  device_t *device)
 {
   const char *value;
-  int class;
 
   value = udev_device_get_sysattr_value(udev_device, "bDeviceClass");
   class_to_device(value, device);
@@ -480,7 +479,6 @@ int
 udev_del_device(struct udev_device *dev)
 {
   const char *node;
-  const char *value;
   int busnum;
   int devnum;
   usbinfo_t ui;
@@ -524,8 +522,6 @@ udev_fill_devices(void)
   struct udev_list_entry *udev_device_list, *udev_device_entry;
   struct udev_device *udev_device;
   const char *path;
-  uint16_t vendor = 0;
-  uint16_t product = 0;
 
   enumerate = udev_enumerate_new(udev_handle);
   udev_enumerate_add_match_subsystem(enumerate, "usb");

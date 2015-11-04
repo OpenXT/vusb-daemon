@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jed Lejosne <lejosnej@ainfosec.com>
+ * Copyright (c) 2015 Assured Information Security, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -146,7 +146,7 @@ device_del(int  busid,
            int  devid)
 {
   struct list_head *pos;
-  device_t *device;
+  device_t *device = NULL;
 
   list_for_each(pos, &devices.list) {
     device = list_entry(pos, device_t, list);
@@ -154,7 +154,7 @@ device_del(int  busid,
       break;
     }
   }
-  if (device->busid == busid && device->devid == devid) {
+  if (device != NULL && device->busid == busid && device->devid == devid) {
     list_del(pos);
     free(device->shortname);
     free(device->longname);
@@ -255,4 +255,30 @@ device_unplug_all_from_vm(int domid)
   }
 
   return res;
+}
+
+/**
+ * @brief Generate a device ID
+ *
+ * Generate a single ID from the bus and device IDs
+ * @param bus_num Device bus
+ * @param dev_num Device ID on the bus
+ */
+int device_make_id(int bus_num, int dev_num)
+{
+  return ((bus_num - 1) << 7) + (dev_num - 1);
+}
+
+/**
+ * @brief Get the bus and device IDs of a device
+ *
+ * Extract bus and device IDs from a single device ID
+ * @param devid   The single ID
+ * @param bus_num Resulting device bus
+ * @param dev_num Resulting Device ID
+ */
+void device_make_bus_dev_pair(int devid, int *bus_num, int *dev_num)
+{
+  *bus_num = (devid >> 7) + 1;
+  *dev_num = (devid & 0x7F) + 1;
 }

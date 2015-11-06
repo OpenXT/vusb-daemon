@@ -575,6 +575,8 @@ udev_event(void)
         xd_log(LOG_INFO, "ADDED");
         /* We keep a reference to the udev device, mainly for advanced rule-matching */
         /* udev_device_unref(dev); */
+        /* Tell the "USB manager" about the new device. */
+        usbmanager_device_added(device);
       } else {
         /* This seems to happen when a device is quickly plugged and
          * unplugged. */

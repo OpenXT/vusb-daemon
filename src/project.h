@@ -100,6 +100,9 @@
 #define INPUT       "com.citrix.xenclient.input"  /**< The dbus name of input */
 #define INPUT_OBJ   "/"                           /**< The main dbus object of input */
 
+#define USBDAEMON   "com.citrix.xenclient.usbdaemon" /**< The dbus name of usb daemon */
+#define USBDAEMON_OBJ "/"                         /**< The main dbus object of usb daemon */
+
 /**
  * The (stupid) logging macro
  */
@@ -209,5 +212,7 @@ char* policy_get_sticky_uuid(int dev);
 int   policy_auto_assign_new_device(device_t *device);
 int   policy_auto_assign_devices_to_new_vm(vm_t *vm);
 void  policy_reload_from_db(void);
+
+void  usbmanager_device_added(device_t *device);
 
 #endif

@@ -39,6 +39,13 @@
  */
 void usbmanager_device_added(device_t *device)
 {
+  int dev_id;
+
+  dev_id = device_make_id(device->busid, device->devid);
+  notify_com_citrix_xenclient_usbdaemon_device_added(g_xcbus,
+                                                     USBDAEMON,
+                                                     USBDAEMON_OBJ,
+                                                     dev_id);
   if (device->type & OPTICAL)
     notify_com_citrix_xenclient_usbdaemon_optical_device_detected(g_xcbus,
                                                                   USBDAEMON,

@@ -508,6 +508,9 @@ udev_del_device(struct udev_device *dev)
   /* Delete the device from the global list */
   ret = device_del(busnum, devnum);
 
+  if (ret == 0)
+    usbmanager_device_removed();
+
   return ret;
 }
 

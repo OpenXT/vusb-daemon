@@ -50,4 +50,17 @@ void usbmanager_device_added(device_t *device)
     notify_com_citrix_xenclient_usbdaemon_optical_device_detected(g_xcbus,
                                                                   USBDAEMON,
                                                                   USBDAEMON_OBJ);
+  notify_com_citrix_xenclient_usbdaemon_devices_changed(g_xcbus,
+							USBDAEMON,
+							USBDAEMON_OBJ);
+}
+
+/**
+ * This should be called after a new device gets removed.
+ */
+void usbmanager_device_removed(void)
+{
+  notify_com_citrix_xenclient_usbdaemon_devices_changed(g_xcbus,
+							USBDAEMON,
+							USBDAEMON_OBJ);
 }

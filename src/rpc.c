@@ -340,6 +340,11 @@ gboolean ctxusb_daemon_assign_device(CtxusbDaemonObject *this,
     return FALSE;
   }
   if (!policy_is_allowed(device, vm)) {
+    notify_com_citrix_xenclient_usbdaemon_device_rejected(g_xcbus,
+							  USBDAEMON,
+							  USBDAEMON_OBJ,
+							  device->shortname,
+							  "policy");
     g_set_error(error,
                 DBUS_GERROR,
                 DBUS_GERROR_FAILED,

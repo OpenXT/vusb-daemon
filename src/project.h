@@ -214,5 +214,6 @@ int   policy_auto_assign_devices_to_new_vm(vm_t *vm);
 void  policy_reload_from_db(void);
 
 void  usbmanager_device_added(device_t *device);
+void  usbmanager_device_removed(void);
 
 #endif

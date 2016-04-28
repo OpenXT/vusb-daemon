@@ -60,8 +60,6 @@ static DBusGConnection *g_glib_dbus_conn = NULL;
 void rpc_init(void)
 {
   CtxusbDaemonObject *server_obj = NULL;
-  /* have to initialise glib type system */
-  g_type_init();
 
   g_glib_dbus_conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, NULL);
   if (!g_glib_dbus_conn) {
@@ -436,9 +434,68 @@ gboolean ctxusb_daemon_name_device(CtxusbDaemonObject *this,
   return TRUE;
 }
 
+static int add_to_string(char **s, int len, const char *fmt, ...)
+{
+  int new_len;
+  va_list ap;
+
+  va_start(ap, fmt);
+  new_len = len + vsnprintf(NULL, 0, fmt, ap) + 1;
+  va_end(ap);
+
+  *s = g_realloc(*s, new_len + 1);
+
+  va_start(ap, fmt);
+  vsprintf(*s + len, fmt, ap);
+  va_end(ap);
+
+  len = new_len;
+  (*s)[len - 1] = '\n';
+  (*s)[len] = '\0';
+
+  return len;
+}
+
 gboolean ctxusb_daemon_state(CtxusbDaemonObject *this,
                              char **OUT_state, GError **error)
 {
+  int l = 0;
+  struct list_head *pos;
+  vm_t *vm;
+  int vm_count = 0;
+  device_t *device;
+  int device_count = 0;
+
+  l = add_to_string(OUT_state, l, "vusb-daemon state:");
+  list_for_each(pos, &vms.list) {
+    vm_count++;
+  }
+  l = add_to_string(OUT_state, l, "  VMs (%d):", vm_count);
+  list_for_each(pos, &vms.list) {
+    vm = list_entry(pos, vm_t, list);
+    if (vm->domid >= 0)
+      l = add_to_string(OUT_state, l, "    Running - %3d - %s", vm->domid, vm->uuid);
+    else
+      l = add_to_string(OUT_state, l, "    Stopped -     - %s", vm->uuid);
+  }
+  list_for_each(pos, &devices.list) {
+    device_count++;
+  }
+  l = add_to_string(OUT_state, l, "  Devices (%d):", device_count);
+  list_for_each(pos, &devices.list) {
+    device = list_entry(pos, device_t, list);
+    l = add_to_string(OUT_state, l, "    %s - %s", device->shortname, device->longname);
+    l = add_to_string(OUT_state, l, "      Type: %d", device->type);
+    l = add_to_string(OUT_state, l, "      Bus ID: %d, Device ID: %d", device->busid, device->devid);
+    l = add_to_string(OUT_state, l, "      Vendor: 0x%04X, Device: 0x%04X", device->vendorid, device->deviceid);
+    if (device->vm != NULL)
+      l = add_to_string(OUT_state, l, "      Assigned to domid %d", device->vm->domid);
+    else
+      l = add_to_string(OUT_state, l, "      Not assigned to any VM");
+  }
+  /* Remove last \n */
+  (*OUT_state)[l - 1] = '\0';
+
   return TRUE;
 }
 

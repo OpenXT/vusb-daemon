@@ -61,6 +61,8 @@ dump_rules(void)
     rule = list_entry(pos, rule_t, list);
     if (rule->cmd == ALWAYS)
       printf("always\n");
+    else if (rule->cmd == DEFAULT)
+      printf("default\n");
     else if (rule->cmd == ALLOW)
       printf("allow\n");
     else if (rule->cmd == DENY)
@@ -178,20 +180,32 @@ vm_matches_rule(rule_t *rule, vm_t *vm)
 }
 
 static rule_t*
-sticky_lookup(device_t *device)
+rule_lookup(device_t *device, enum command cmd)
 {
   struct list_head *pos;
   rule_t *rule;
 
   list_for_each(pos, &rules.list) {
     rule = list_entry(pos, rule_t, list);
-    if (rule->cmd == ALWAYS &&
+    if (rule->cmd == cmd &&
         device_matches_rule(rule, device)) {
       return rule;
     }
   }
 
   return NULL;
+}
+
+static rule_t*
+sticky_lookup(device_t *device)
+{
+  return rule_lookup(device, ALWAYS);
+}
+
+static rule_t*
+default_lookup(device_t *device)
+{
+  return rule_lookup(device, DEFAULT);
 }
 
 /**
@@ -307,7 +321,7 @@ policy_is_allowed(device_t *device, vm_t *vm)
 
   list_for_each(pos, &rules.list) {
     rule = list_entry(pos, rule_t, list);
-    /* First match wins (or looses), ALWAYS implies ALLOW */
+    /* First match wins (or looses), ALWAYS/DEFAULT implies ALLOW */
     if (device_matches_rule(rule, device) &&
         vm_matches_rule(rule, vm))
       return (rule->cmd != DENY);
@@ -332,19 +346,20 @@ policy_auto_assign_new_device(device_t *device)
   rule_t *rule;
   vm_t *vm = NULL;
   int uivm;
+  int res = 1;
 
-  /* If there's a sticky rule for the device, assign the the
-   * corresponding VM (if it's running). If there's no sticky rule
+  /* If there's a sticky/default rule for the device, assign it to the
+   * corresponding VM (if it's running). If there's no sticky/default rule
    * for the device, consider assigning it to the focused VM */
   rule = sticky_lookup(device);
+  if (rule == NULL)
+    rule = default_lookup(device);
   if (rule != NULL) {
     vm = vm_lookup_by_uuid(rule->vm_uuid);
   } else {
-    if (vm == NULL) {
-      vm = vm_focused();
-      if (vm != NULL && !vm_gets_devices_when_in_focus(vm))
-        vm = NULL;
-    }
+    vm = vm_focused();
+    if (vm != NULL && vm->domid > 0 && !vm_gets_devices_when_in_focus(vm))
+      vm = NULL;
   }
 
   property_get_com_citrix_xenclient_xenmgr_vm_domid_(g_xcbus, XENMGR, UIVM_PATH, &uivm);
@@ -353,16 +368,13 @@ policy_auto_assign_new_device(device_t *device)
       vm->domid != uivm &&
       policy_is_allowed(device, vm))
   {
-    int res;
-
     device->vm = vm;
     res = usbowls_plug_device(vm->domid, device->busid, device->devid);
     if (res != 0)
       device->vm = NULL;
-    return res;
   }
 
-  return 1;
+  return res;
 }
 
 /**
@@ -381,11 +393,13 @@ policy_auto_assign_devices_to_new_vm(vm_t *vm)
   device_t *device;
   int ret = 0;
 
-  /* For all the ALWAYS rules that match the VM, assign all devices
-   * that match the rule to the VM */
+  /* For all the ALWAYS and DEFAULT rules that match the VM,
+   * assign all devices that match the rule to the VM */
   list_for_each(pos, &rules.list) {
     rule = list_entry(pos, rule_t, list);
-    if (rule->cmd == ALWAYS && !strcmp(rule->vm_uuid, vm->uuid)) {
+    if ((rule->cmd == ALWAYS || rule->cmd == DEFAULT) &&
+       rule->vm_uuid != NULL && /* NULL vm_uuid means dom0, means no assignment */
+       !strcmp(rule->vm_uuid, vm->uuid)) {
       list_for_each(device_pos, &devices.list) {
         device = list_entry(device_pos, device_t, list);
         if (!device_matches_rule(rule, device))

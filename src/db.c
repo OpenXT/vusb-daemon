@@ -237,6 +237,8 @@ parse_rule(char *rule_node)
         if (value != NULL) {
           if (!strcmp(value, "always"))
             res->cmd = ALWAYS;
+          else if (!strcmp(value, "default"))
+            res->cmd = DEFAULT;
           else if (!strcmp(value, "allow"))
             res->cmd = ALLOW;
           else if (!strcmp(value, "deny"))
@@ -360,6 +362,8 @@ db_write_policy(rule_t *rules)
     if (rule->cmd == ALWAYS)
       db_write_rule_key(rule->pos, NODE_COMMAND, "always");
     else if (rule->cmd == ALLOW)
+      db_write_rule_key(rule->pos, NODE_COMMAND, "default");
+    else if (rule->cmd == DEFAULT)
       db_write_rule_key(rule->pos, NODE_COMMAND, "allow");
     else if (rule->cmd == DENY)
       db_write_rule_key(rule->pos, NODE_COMMAND, "deny");

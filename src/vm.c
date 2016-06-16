@@ -64,6 +64,9 @@ vm_lookup_by_uuid(const char *uuid)
   struct list_head *pos;
   vm_t *vm = NULL;
 
+  if (uuid == NULL)
+    return NULL;
+
   list_for_each(pos, &vms.list) {
     vm = list_entry(pos, vm_t, list);
     if (!strcmp(vm->uuid, uuid)) {

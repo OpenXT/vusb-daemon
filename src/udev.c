@@ -28,6 +28,11 @@
 
 #include "project.h"
 
+#define BMATTRIBUTES_BULK               0x02
+#define BENDPOINTADDRESS_IN             0x80
+#define TYPICAL_NIC_PACKET_SIZE         0x0200
+#define MAX_ENDPOINTS                   1000
+
 /**
  * The global udev monitor handler. Only used in udev.c
  */
@@ -246,6 +251,7 @@ udev_find_more(struct udev_device *dev, device_t *device, int new)
     udev_find_more_about_input(udev_device, device);
     udev_find_more_about_class(udev_device, device);
     udev_find_more_about_optical(udev_device, device, new);
+    libusb_find_more_about_nic(device);
     udev_device_unref(udev_device);
   }
 
@@ -575,6 +581,8 @@ udev_event(void)
         xd_log(LOG_INFO, "   Joystick: %d", !!(device->type & GAME_CONTROLLER));
         xd_log(LOG_INFO, "   MassStorage: %d", !!(device->type & MASS_STORAGE));
         xd_log(LOG_INFO, "   Optical: %d", !!(device->type & OPTICAL));
+        xd_log(LOG_INFO, "   NIC: %d", !!(device->type & NIC));
+        xd_log(LOG_INFO, "   Bluetooth: %d", !!(device->type & BLUETOOTH));
         xd_log(LOG_INFO, "ADDED");
         /* We keep a reference to the udev device, mainly for advanced rule-matching */
         /* udev_device_unref(dev); */

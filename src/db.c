@@ -136,6 +136,24 @@ parse_device(char *rule_path, char *rule, rule_t *res)
             res->dev_type |= KEYBOARD;
           g_free(value);
         }
+      } else if (!strcmp(*rul, NODE_NIC)) {
+        value = parse_value(node_path, *rul);
+        if (value != NULL) {
+          if (*value == '0')
+            res->dev_not_type |= NIC;
+          else
+            res->dev_type |= NIC;
+          g_free(value);
+        }
+      } else if (!strcmp(*rul, NODE_BLUETOOTH)) {
+        value = parse_value(node_path, *rul);
+        if (value != NULL) {
+          if (*value == '0')
+            res->dev_not_type |= BLUETOOTH;
+          else
+            res->dev_type |= BLUETOOTH;
+          g_free(value);
+        }
       } else if (!strcmp(*rul, NODE_GAME_CONTROLLER)) {
         value = parse_value(node_path, *rul);
         if (value != NULL) {
@@ -383,6 +401,12 @@ db_write_policy(rule_t *rules)
         db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_MASS_STORAGE, "1");
       if (rule->dev_type & OPTICAL)
         db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_OPTICAL, "1");
+      if (rule->dev_type & NIC)
+        db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_NIC, "1");
+      if (rule->dev_type & BLUETOOTH)
+        db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_BLUETOOTH, "1");
+
+ 
     }
     if (rule->dev_not_type != 0) {
       if (rule->dev_not_type & KEYBOARD)
@@ -393,6 +417,11 @@ db_write_policy(rule_t *rules)
         db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_GAME_CONTROLLER, "0");
       if (rule->dev_not_type & MASS_STORAGE)
         db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_MASS_STORAGE, "0");
+      if (rule->dev_not_type & NIC)
+        db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_NIC, "0");
+      if (rule->dev_not_type & BLUETOOTH)
+        db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_BLUETOOTH, "0");
+
     }
     if (rule->dev_vendorid != 0) {
       snprintf(value, 5, "%04X", rule->dev_vendorid);

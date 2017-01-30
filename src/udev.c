@@ -246,6 +246,7 @@ udev_find_more(struct udev_device *dev, device_t *device, int new)
     udev_find_more_about_input(udev_device, device);
     udev_find_more_about_class(udev_device, device);
     udev_find_more_about_optical(udev_device, device, new);
+    libusb_find_more_about_nic(device);
     udev_device_unref(udev_device);
   }
 

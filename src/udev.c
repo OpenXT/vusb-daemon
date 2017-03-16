@@ -68,7 +68,7 @@ udev_settle(void)
 
   queue = udev_queue_new(udev_handle);
   if (!queue) {
-    xd_log(LOG_WARN, "udev_queue_new failed");
+    xd_log(LOG_WARNING, "udev_queue_new failed");
     /* We failed to get a queue, let's just sleep 0.1 seconds,
        it's usually enough the get udev settled... */
     usleep(100000);

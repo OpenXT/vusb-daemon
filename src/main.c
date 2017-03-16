@@ -41,7 +41,7 @@ static void fill_vms()
      which is fine since we'll get new VM notifications once xenmgr is up and runnning */
   com_citrix_xenclient_xenmgr_list_vms_(g_xcbus, XENMGR, XENMGR_OBJ, &paths);
   if (!com_citrix_xenclient_xenmgr_list_vms_(g_xcbus, XENMGR, XENMGR_OBJ, &paths)) {
-    xd_log(LOG_WARN, "Unable to get the list of VMs");
+    xd_log(LOG_WARNING, "Unable to get the list of VMs");
     return;
   }
 

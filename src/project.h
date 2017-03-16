@@ -106,7 +106,12 @@
 /**
  * The (stupid) logging macro
  */
-#define xd_log(I, ...) do { fprintf(stderr, ##__VA_ARGS__); fprintf(stderr, "\n"); } while (0)
+#define xd_log(I, ...) do {          \
+    if (I == LOG_DEBUG)              \
+      break;                         \
+    fprintf(stderr, ##__VA_ARGS__);  \
+    fprintf(stderr, "\n");           \
+  } while (0)
 
 /**
  * @brief VM structure

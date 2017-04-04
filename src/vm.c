@@ -122,7 +122,7 @@ vm_add(const int domid, const char *uuid)
       return NULL;
     }
     if (!strcmp(vm->uuid, new_uuid)) {
-      xd_log(LOG_WARN, "VM already registered: %s. Changing domid", new_uuid);
+      xd_log(LOG_WARNING, "VM already registered: %s. Changing domid", new_uuid);
       vm->domid = domid;
       return vm;
     }

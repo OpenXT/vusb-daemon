@@ -78,7 +78,7 @@ xenstore_add_dir(xs_transaction_t xt, char *path, int d0, int p0, int d1, int p1
 {
   struct xs_permissions perms[2];
 
-  xd_log(LOG_VERBOSE_DEBUG, "Making %s in XenStore", path);
+  xd_log(LOG_DEBUG, "Making %s in XenStore", path);
   if (xs_mkdir(xs_handle, xt, path) == false) {
     xd_log(LOG_ERR, "XenStore error mkdir()ing %s", path);
     return -1;
@@ -175,7 +175,7 @@ xenstore_set_keyval(xs_transaction_t xt, char *path, char *key, char *val)
     snprintf(tmppath, sizeof (tmppath), "%s/%s", path, key);
     path = tmppath;
   }
-  xd_log(LOG_VERBOSE_DEBUG, "Writing to XenStore: %s = %s", path, val);
+  xd_log(LOG_DEBUG, "Writing to XenStore: %s = %s", path, val);
 
   if (xs_write(xs_handle, xt, path, val, strlen(val)) == false) {
     xd_log(LOG_ERR, "XenStore error writing %s", path);

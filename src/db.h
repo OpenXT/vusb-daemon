@@ -54,6 +54,7 @@
 #define NODE_OPTICAL          "optical"
 #define NODE_NIC              "nic"
 #define NODE_BLUETOOTH        "bluetooth"
+#define NODE_AUDIO            "audio"
 #define NODE_VENDOR_ID        "vendor_id"
 #define NODE_DEVICE_ID        "device_id"
 #define NODE_SERIAL           "serial"

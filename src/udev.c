@@ -131,6 +131,8 @@ class_to_device(const char *class, device_t *device)
     c = strtol(class, NULL, 16);
     if (c == 0x08)
       device->type |= MASS_STORAGE;
+    if (c == AUDIO_CLASS)
+      device->type |= AUDIO;
   }
 }
 

@@ -203,7 +203,7 @@ static const class_t classes[] = {
 };
 
 /* This is a partial list of classes, interfaces, and protocols used for device type filtering */
-
+#define AUDIO_CLASS                     0x01
 #define COMMUNICATIONS_CLASS            0x02
 #define WIRELESS_CLASS                  0xE0
 #define VENDOR_SPECIFIC_CLASS           0xFF

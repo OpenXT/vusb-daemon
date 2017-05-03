@@ -136,6 +136,15 @@ parse_device(char *rule_path, char *rule, rule_t *res)
             res->dev_type |= KEYBOARD;
           g_free(value);
         }
+      } else if (!strcmp(*rul, NODE_AUDIO)) {
+        value = parse_value(node_path, *rul);
+        if (value != NULL) {
+          if (*value == '0')
+            res->dev_not_type |= AUDIO;
+          else
+            res->dev_type |= AUDIO;
+          g_free(value);
+        }
       } else if (!strcmp(*rul, NODE_NIC)) {
         value = parse_value(node_path, *rul);
         if (value != NULL) {
@@ -405,6 +414,8 @@ db_write_policy(rule_t *rules)
         db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_NIC, "1");
       if (rule->dev_type & BLUETOOTH)
         db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_BLUETOOTH, "1");
+      if (rule->dev_type & AUDIO)
+        db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_AUDIO, "1");
     }
     if (rule->dev_not_type != 0) {
       if (rule->dev_not_type & KEYBOARD)
@@ -419,6 +430,8 @@ db_write_policy(rule_t *rules)
         db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_NIC, "0");
       if (rule->dev_not_type & BLUETOOTH)
         db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_BLUETOOTH, "0");
+      if (rule->dev_not_type & AUDIO)
+        db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_AUDIO, "0");
     }
     if (rule->dev_vendorid != 0) {
       snprintf(value, 5, "%04X", rule->dev_vendorid);

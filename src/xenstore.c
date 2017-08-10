@@ -78,6 +78,9 @@ xenstore_add_dir(xs_transaction_t xt, char *path, int d0, int p0, int d1, int p1
 {
   struct xs_permissions perms[2];
 
+  if (xs_handle == NULL)
+    return -1;
+
   xd_log(LOG_DEBUG, "Making %s in XenStore", path);
   if (xs_mkdir(xs_handle, xt, path) == false) {
     xd_log(LOG_ERR, "XenStore error mkdir()ing %s", path);
@@ -115,6 +118,9 @@ xenstore_dom_read(unsigned int domid, const char *format, ...)
   char *ret = NULL;
   char *buff = NULL;
 
+  if (xs_handle == NULL)
+    return NULL;
+
   domain_path = xs_get_domain_path(xs_handle, domid);
 
   if (!domain_path)
@@ -143,6 +149,9 @@ xenstore_dom_read(unsigned int domid, const char *format, ...)
 int
 xenstore_get_dominfo(int domid, dominfo_t *di)
 {
+  if (xs_handle == NULL)
+    return -ENOENT;
+
   di->di_domid = domid;
   di->di_dompath = xs_get_domain_path(xs_handle, di->di_domid);
   if (!di->di_dompath) {
@@ -158,6 +167,9 @@ xenstore_get_keyval(char *path, char *key)
 {
   char tmppath[256];
 
+  if (xs_handle == NULL)
+    return NULL;
+
   snprintf(tmppath, sizeof(tmppath), "%s/%s", path, key);
 
   return xs_read(xs_handle, XBT_NULL, tmppath, NULL);
@@ -170,6 +182,9 @@ static int
 xenstore_set_keyval(xs_transaction_t xt, char *path, char *key, char *val)
 {
   char tmppath[256];
+
+  if (xs_handle == NULL)
+    return -1;
 
   if (key != NULL) {
     snprintf(tmppath, sizeof (tmppath), "%s/%s", path, key);
@@ -230,6 +245,11 @@ xenstore_list_domain_devs(dominfo_t *domp)
   int domid = domp->di_domid;
   unsigned int count, i;
 
+  if (xs_handle == NULL) {
+    xd_log(LOG_ERR, "XenStore handle is NULL");
+    return;
+  }
+
   snprintf(xpath, sizeof(xpath), "/local/domain/0/backend/vusb/%d", domid);
   devs = xs_directory(xs_handle, XBT_NULL, xpath, &count);
   if (devs) {
@@ -258,6 +278,9 @@ xenstore_create_usb(dominfo_t *domp, usbinfo_t *usbp)
   char *bepath, *fepath;
   char value[32];
   xs_transaction_t trans;
+
+  if (xs_handle == NULL)
+    return -1;
 
   xd_log(LOG_DEBUG, "Creating VUSB node for %d.%d",
          usbp->usb_bus, usbp->usb_device);
@@ -346,6 +369,9 @@ wait_for_states(char *bepath, char *fepath, enum XenBusStates a, enum XenBusStat
   int fd;
   struct timeval tv = { .tv_sec = 5, .tv_usec = 0 };
   int ret = -1;
+
+  if (xs_handle == NULL)
+    return -1;
 
   bstatelen = strlen(bepath) + strlen("/state") + 1;
   fstatelen = strlen(fepath) + strlen("/state") + 1;
@@ -467,6 +493,9 @@ xenstore_destroy_usb(dominfo_t *domp, usbinfo_t *usbp)
   char *fepath;
   int ret;
 
+  if (xs_handle == NULL)
+    return -1;
+
   xd_log(LOG_DEBUG, "Deleting VUSB node %d for %d.%d",
          usbp->usb_virtid, usbp->usb_bus, usbp->usb_device);
 
@@ -533,6 +562,9 @@ xenstore_init(void)
 void
 xenstore_deinit(void)
 {
+  if (xs_handle == NULL)
+    return;
+
   xs_daemon_close(xs_handle);
   xs_handle = NULL;
 }

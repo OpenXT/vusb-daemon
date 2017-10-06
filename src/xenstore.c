@@ -151,7 +151,24 @@ xenstore_dom_read(unsigned int domid, const char *format, ...)
 int
 xenstore_get_dominfo(int domid, dominfo_t *di)
 {
+  char *stubdomid;
+  int stubid = 0;
+  vm_t *vm;
+
   di->di_domid = domid;
+
+  vm = vm_lookup(domid);
+  if (vm && vm->emulate) {
+    stubdomid = xenstore_dom_read(domid, "image/device-model-domid");
+    if (stubdomid) {
+      stubid = strtol(stubdomid, NULL, 0);
+      free(stubdomid);
+    }
+    if (stubid > 0 && stubid < DOMID_FIRST_RESERVED) {
+      di->di_domid = stubid;
+    }
+  }
+
   di->di_dompath = xs_get_domain_path(xs_handle, di->di_domid);
   if (!di->di_dompath) {
     xd_log(LOG_ERR, "Could not get domain %d path from xenstore", domid);

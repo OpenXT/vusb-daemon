@@ -124,6 +124,7 @@ typedef struct {
   struct list_head list; /**< Linux-kernel-style list item */
   int domid;             /**< VM domid */
   char *uuid;            /**< VM UUID */
+  bool emulate;          /**< Use stubdom for emulated passthrough */
 } vm_t;
 
 /**

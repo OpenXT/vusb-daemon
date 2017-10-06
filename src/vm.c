@@ -110,6 +110,10 @@ vm_add(const int domid, const char *uuid)
   struct list_head *pos;
   vm_t *vm;
   char *new_uuid;
+  char path[64];
+  char *pvaddons_version = NULL;
+  gboolean pvaddons = true;
+  gboolean force_emulate = false;
 
   /* The UUID may have "_"s instead of "-"s, like in the xenmgr dbus reply.
      Fix this while duplicating the UUID. */
@@ -134,10 +138,35 @@ vm_add(const int domid, const char *uuid)
     }
   }
 
-  xd_log(LOG_DEBUG, "Adding vm, domid=%d, uuid=%s", domid, new_uuid);
+  snprintf(path, sizeof(path), "/vm/%s", new_uuid);
+  for (char *p = path; *p; p++) {
+    if (*p == '-') {
+      *p = '_';
+    }
+  }
+
+  if (!property_get_com_citrix_xenclient_xenmgr_vm_pv_addons_(g_xcbus, XENMGR, path, &pvaddons)) {
+    xd_log(LOG_ERR, "Error retrieving pvaddon status: %s %d", new_uuid, domid);
+  }
+
+  if (!property_get_com_citrix_xenclient_xenmgr_vm_pv_addons_version_(g_xcbus, XENMGR, path, &pvaddons_version)) {
+    xd_log(LOG_ERR, "Error retrieving pvaddon version: %s %d", new_uuid, domid);
+    pvaddons_version = NULL;
+  }
+
+  if (pvaddons_version && strcmp(pvaddons_version, "force-emulate") == 0) {
+    xd_log(LOG_INFO, "Forcing emulation: %s %d", new_uuid, domid);
+    force_emulate = true;
+  }
+
+  free(pvaddons_version);
+
+  xd_log(LOG_DEBUG, "Adding vm, domid=%d, uuid=%s pvaddons=%d force_emulate=%d",
+         domid, new_uuid, pvaddons, force_emulate);
   vm = malloc(sizeof(vm_t));
   vm->domid = domid;
   vm->uuid = new_uuid;
+  vm->emulate = force_emulate || !pvaddons;
   list_add(&vm->list, &vms.list);
 
   return vm;

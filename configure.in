@@ -9,7 +9,9 @@ dnl
 dnl
 dnl
 AC_PREREQ(2.13)
-AC_INIT(src/main.c)
+AC_CONFIG_SRCDIR([src/main.c])
+AC_INIT([ctxusb_daemon], [1.0.1])
+AM_INIT_AUTOMAKE([foreign])
 
 AC_PROG_CC
 AC_PROG_CPP
@@ -41,7 +43,7 @@ AC_SUBST(VUSBDAEMON_VERSION)
 VERSION=$VUSBDAEMON_VERSION
 PACKAGE=vusb-daemon
 
-AM_INIT_AUTOMAKE($PACKAGE,$VERSION)
+
 
 
 AM_CONFIG_HEADER(src/config.h)

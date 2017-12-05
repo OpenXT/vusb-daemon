@@ -42,12 +42,12 @@ BUILT_SOURCES = \
 
 
 rpcgen/%_client.h: ${IDLDIR}/%.xml
-	mkdir rpcgen || true
-	${XC_RPCGEN} -c -o rpcgen/ $<
+	mkdir -p rpcgen
+	${XC_RPCGEN} --templates-dir=${RPCGEN_TEMPLATES} -c -o rpcgen/ $<
 
 rpcgen/%_server_marshall.h rpcgen/%_server_obj.h rpcgen/%_server_obj.c : ${IDLDIR}/%.xml
-	mkdir rpcgen || true
-	${XC_RPCGEN} -s -o rpcgen/ $<
+	mkdir -p rpcgen
+	${XC_RPCGEN} --templates-dir=${RPCGEN_TEMPLATES} -s -o rpcgen/ $<
 
 protos: ${BUILD_SOURCES}
 	echo > prototypes.h

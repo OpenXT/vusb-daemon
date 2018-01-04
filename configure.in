@@ -10,7 +10,7 @@ dnl
 dnl
 AC_PREREQ(2.13)
 AC_CONFIG_SRCDIR([src/main.c])
-AC_INIT([ctxusb_daemon], [1.0.1])
+AC_INIT([vusb_daemon], [1.0.1])
 AM_INIT_AUTOMAKE([foreign])
 
 AC_PROG_CC

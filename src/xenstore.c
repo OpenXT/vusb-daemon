@@ -382,6 +382,7 @@ wait_for_states(char *bepath, char *fepath, enum XenBusStates a, enum XenBusStat
       break;
     } else {
       bs = *buf - '0';
+      free(buf);
     }
     buf = xs_read(xs_handle, XBT_NULL, fstate, NULL);
     if (buf == NULL) {
@@ -390,6 +391,7 @@ wait_for_states(char *bepath, char *fepath, enum XenBusStates a, enum XenBusStat
       break;
     } else {
       fs = *buf - '0';
+      free(buf);
     }
     if ((fs == a || fs == b) &&
         (bs == a || bs == b))

@@ -485,6 +485,7 @@ gboolean ctxusb_daemon_state(CtxusbDaemonObject *this,
   list_for_each(pos, &devices.list) {
     device = list_entry(pos, device_t, list);
     l = add_to_string(OUT_state, l, "    %s - %s", device->shortname, device->longname);
+    l = add_to_string(OUT_state, l, "      ID: %d", device_make_id(device->busid, device->devid));
     l = add_to_string(OUT_state, l, "      Type: %d", device->type);
     l = add_to_string(OUT_state, l, "      Bus ID: %d, Device ID: %d", device->busid, device->devid);
     l = add_to_string(OUT_state, l, "      Vendor: 0x%04X, Device: 0x%04X", device->vendorid, device->deviceid);

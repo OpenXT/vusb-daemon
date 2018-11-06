@@ -230,7 +230,7 @@ xenstore_list_domain_devs(dominfo_t *domp)
   int domid = domp->di_domid;
   unsigned int count, i;
 
-  snprintf(xpath, sizeof(xpath), "/local/domain/0/backend/vusb/%d", domid);
+  snprintf(xpath, sizeof(xpath), "%s/backend/vusb/%d", xs_dom0path, domid);
   devs = xs_directory(xs_handle, XBT_NULL, xpath, &count);
   if (devs) {
     for (i = 0; i < count; ++i) {

@@ -115,6 +115,12 @@ vm_add(const int domid, const char *uuid)
      Fix this while duplicating the UUID. */
   new_uuid = uuid_copy_and_sanitize(uuid);
 
+  if (domid > 0 && strcmp(new_uuid, USBVM_UUID) == 0) {
+    xd_log(LOG_WARNING, "Changing USB backend from %d to %d", usb_backend_domid,
+           domid);
+    xenstore_new_backend(domid);
+  }
+
   list_for_each(pos, &vms.list) {
     vm = list_entry(pos, vm_t, list);
     if (vm->domid == domid) {

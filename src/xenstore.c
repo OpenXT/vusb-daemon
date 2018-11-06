@@ -29,9 +29,10 @@
 #include "project.h"
 
 /**
- * The xenstore dom0 path, set by xenstore_init()
+ * The xenstore USB backend domain path, set by xenstore_init()
  */
-char *xs_dom0path = NULL;
+char *xs_backend_path = NULL;
+int usb_backend_domid = 0;
 
 static void*
 xmalloc(size_t size)
@@ -195,7 +196,7 @@ xenstore_dev_fepath(dominfo_t *domp, char *type, int devnum)
 static char*
 xenstore_dev_bepath(dominfo_t *domp, char *type, int devnum)
 {
-  return (xasprintf("%s/backend/%s/%d/%d", xs_dom0path, type,
+  return (xasprintf("%s/backend/%s/%d/%d", xs_backend_path, type,
                     domp->di_domid, devnum));
 }
 
@@ -230,7 +231,7 @@ xenstore_list_domain_devs(dominfo_t *domp)
   int domid = domp->di_domid;
   unsigned int count, i;
 
-  snprintf(xpath, sizeof(xpath), "%s/backend/vusb/%d", xs_dom0path, domid);
+  snprintf(xpath, sizeof(xpath), "%s/backend/vusb/%d", xs_backend_path, domid);
   devs = xs_directory(xs_handle, XBT_NULL, xpath, &count);
   if (devs) {
     for (i = 0; i < count; ++i) {
@@ -503,7 +504,7 @@ xenstore_destroy_usb(dominfo_t *domp, usbinfo_t *usbp)
  * @return 0 on success, 1 on failure
  */
 int
-xenstore_init(void)
+xenstore_init(const int backend_domid)
 {
   if (xs_handle == NULL) {
     xs_handle = xs_daemon_open();
@@ -514,16 +515,27 @@ xenstore_init(void)
     return 1;
   }
 
-  if (xs_dom0path == NULL) {
-    xs_dom0path = xs_get_domain_path(xs_handle, 0);
+  if (xs_backend_path == NULL) {
+    xs_backend_path = xs_get_domain_path(xs_handle, backend_domid);
   }
 
-  if (xs_dom0path == NULL) {
-    xd_log(LOG_ERR, "Could not get domain 0 path from XenStore");
+  if (xs_backend_path == NULL) {
+    xd_log(LOG_ERR, "Could not get backend path from XenStore");
     return 1;
   }
 
+  usb_backend_domid = backend_domid;
+
   return 0;
+}
+
+int
+xenstore_new_backend(const int backend_domid)
+{
+  free(xs_backend_path);
+  xs_backend_path = NULL;
+
+  return xenstore_init(backend_domid);
 }
 
 /**

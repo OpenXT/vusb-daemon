@@ -93,6 +93,8 @@
 #define DOM0_UUID   "00000000-0000-0000-0000-000000000000" /**< Dom0's UUID */
 #define UIVM_UUID   "00000000-0000-0000-0000-000000000001" /**< UIVM's UUID */
 #define UIVM_PATH   "/vm/00000000_0000_0000_0000_000000000001" /**< UIVM's xenstore path */
+#define USBVM_UUID   "00000000-0000-0000-0000-000000000003" /**< USBVM's UUID */
+#define USBVM_PATH   "/vm/00000000_0000_0000_0000_000000000003" /**< USBVM's xenstore path */
 
 #define XENMGR      "com.citrix.xenclient.xenmgr" /**< The dbus name of xenmgr */
 #define XENMGR_OBJ  "/"                           /**< The main dbus object of xenmgr */
@@ -219,7 +221,7 @@ char* xenstore_dom_read (unsigned int domid, const char *format, ...);
 int   xenstore_get_dominfo(int domid, dominfo_t *di);
 void  xenstore_get_xb_states(dominfo_t *domp, usbinfo_t *usbp, int *frontst, int *backst);
 void  xenstore_list_domain_devs(dominfo_t *domp);
-int   xenstore_init(void);
+int   xenstore_init(const int backend_domid);
 void  xenstore_deinit(void);
 
 int   policy_init(void);

@@ -602,6 +602,37 @@ xsdev_watch_init(void)
   return xs_fileno(xs_handle);
 }
 
+void xsdev_del(device_t *dev)
+{
+  if (g_xcbus) {
+    return;
+  }
+
+  xd_log(LOG_INFO, "%s %d %d %s", __func__, dev->busid, dev->devid,
+         dev->sysname);
+
+  char *path = xasprintf("data/usb/dev%d-%d", dev->busid, dev->devid);
+  if (path == NULL) {
+    xd_log(LOG_ERR, "%s: xasprintf path failed", __func__);
+    return;
+  }
+
+  char *vusb_watch = xasprintf("%s/assign", path);
+  char *vusb_token = xasprintf("assign:%x %x", dev->vendorid,
+                 dev->deviceid);
+
+  xs_unwatch(xs_handle, vusb_watch, vusb_token);
+
+  free(vusb_watch);
+  free(vusb_token);
+
+  if (xs_rm(xs_handle, XBT_NULL, path) == false) {
+    xd_log(LOG_ERR, "failure xs_rm(%s)", path);
+  }
+
+  free(path);
+}
+
 void xsdev_write(device_t *dev)
 {
   xs_transaction_t t;

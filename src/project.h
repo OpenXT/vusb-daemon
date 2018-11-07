@@ -231,6 +231,7 @@ int   xenstore_new_backend(const int backend_domid);
 int   xsdev_watch_init(void);
 void  xsdev_watch_deinit(void);
 void  xsdev_write(device_t *dev);
+void  xsdev_del(device_t *dev);
 
 int   policy_init(void);
 void  policy_add_rule(rule_t *rule);

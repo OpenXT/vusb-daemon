@@ -206,6 +206,7 @@ device_del(int  busid,
   }
   if (device != NULL && device->busid == busid && device->devid == devid) {
     list_del(pos);
+    xsdev_del(device);
     device_free(device);
   } else {
     xd_log(LOG_ERR, "Device not found: %d-%d", busid, devid);

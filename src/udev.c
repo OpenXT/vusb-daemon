@@ -521,6 +521,10 @@ udev_maybe_add_device(struct udev_device *dev, int auto_assign)
   if (auto_assign > 0)
     policy_auto_assign_new_device(device);
 
+  if (device) {
+    xsdev_write(device);
+  }
+
   return device;
 }
 

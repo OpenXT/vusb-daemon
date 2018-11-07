@@ -602,6 +602,76 @@ xsdev_watch_init(void)
   return xs_fileno(xs_handle);
 }
 
+void xsdev_write(device_t *dev)
+{
+  xs_transaction_t t;
+
+  if (g_xcbus) {
+    return;
+  }
+
+  xd_log(LOG_INFO, "%s %d %d %s", __func__, dev->busid, dev->devid,
+         dev->sysname);
+
+  char *path = xasprintf("data/usb/dev%d-%d", dev->busid, dev->devid);
+  if (path == NULL) {
+    xd_log(LOG_ERR, "%s: xasprintf path failed", __func__);
+    return;
+  }
+
+  xenstore_add_dir(XBT_NULL, "data/usb", my_domid, XS_PERM_NONE,
+                             0, XS_PERM_READ);
+
+  /* TODO Add transaction abort? */
+ restart:
+  t = xs_transaction_start(xs_handle);
+
+  xs_mkdir(xs_handle, t, path);
+
+#define xs_write_fmt(fmt, v) { \
+  char *_path = xasprintf("%s/%s", path, #v); \
+  char *_v = xasprintf(fmt, dev->v); \
+  xs_write(xs_handle, t, _path, _v, strlen(_v)); \
+  free(_v); \
+  free(_path); }
+#define xs_write_int(v) xs_write_fmt("%d", v)
+#define xs_write_hex(v) xs_write_fmt("%#x", v)
+
+  xs_write_int(busid);
+  xs_write_int(devid);
+  xs_write_hex(vendorid);
+  xs_write_hex(deviceid);
+  xs_write_hex(type);
+
+#define xs_write_string(v) { \
+  if (dev->v) { \
+    char *_path = xasprintf("%s/%s", path, #v); \
+    xs_write(xs_handle, t, _path, dev->v, strlen(dev->v)); \
+    free(_path); } \
+  }
+
+  xs_write_string(serial);
+  xs_write_string(shortname);
+  xs_write_string(longname);
+  xs_write_string(sysname);
+
+#undef xs_write_string
+#undef xs_write_int
+#undef xs_write_hex
+#undef xs_write_fmt
+
+  if (xs_transaction_end(xs_handle, t, false) == false) {
+    if (errno == EAGAIN) {
+      goto restart;
+    }
+    xd_log(LOG_ERR, "%s xs_transaction_failed errno=%d (%s)",
+           __func__, errno, strerror(errno));
+    xs_transaction_end(xs_handle, t, true);
+  }
+
+  free(path);
+}
+
 void
 xsdev_event_one(char *path)
 {

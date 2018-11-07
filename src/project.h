@@ -197,6 +197,8 @@ int   udev_device_tree_match(struct udev_device *dev,
 
 int   libusb_find_more_about_nic(int vendorid, int deviceid);
 
+int   common_del_device(int busnum, int devnum);
+
 device_t* device_lookup(int busid, int devid);
 device_t* device_lookup_by_attributes(int vendorid, int deviceid, char *serial);
 int       device_is_ambiguous(device_t* device);

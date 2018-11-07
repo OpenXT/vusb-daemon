@@ -703,6 +703,34 @@ void xsdev_write(device_t *dev)
   free(path);
 }
 
+void xsdev_remove(char *path)
+{
+  int busid;
+  int devid;
+  int num;
+  char *p;
+
+  xd_log(LOG_INFO, "%s path=%s", __func__, path);
+
+  p = strrchr(path, '/');
+  if (p == NULL) {
+    xd_log(LOG_ERR, "could not find '/' in path=%s", path);
+
+    return;
+  }
+  p++;
+
+  num = sscanf(p, "dev%d-%d", &busid, &devid);
+  if (num != 2) {
+    xd_log(LOG_ERR, "%s could not parse path=%s", __func__, path);
+
+    return;
+  }
+
+  xd_log(LOG_INFO, "%s removing dev%d-%d", __func__, busid, devid);
+  common_del_device(busid, devid);
+}
+
 void
 xsdev_event_one(char *path)
 {
@@ -723,7 +751,9 @@ xsdev_event_one(char *path)
 
   dev_path = xs_read(xs_handle, 0, path, &len);
   if (dev_path == NULL) {
-    /* Remove */
+    xsdev_remove(path);
+
+    return;
   }
   free(dev_path);
 

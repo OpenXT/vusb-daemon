@@ -84,7 +84,7 @@ void dbus_post_select(int nfds, fd_set *readfds, fd_set *writefds,
 }
 
 int
-main() {
+main(int argc, char *argv[]) {
   int ret;
   fd_set readfds;
   fd_set writefds;
@@ -92,6 +92,7 @@ main() {
   int nfds;
   int xsfd;
   int udevfd;
+  int dbus = 1;
 
   /* init libusb */
   usb_init();
@@ -100,23 +101,33 @@ main() {
   INIT_LIST_HEAD(&vms.list);
   INIT_LIST_HEAD(&devices.list);
 
+  if (argc > 1 && strcmp(argv[1], "stub-mode") == 0) {
+    xd_log(LOG_INFO, "Running in stub-mode (no D-Bus)");
+    dbus = 0;
+    g_xcbus = NULL;
+  } else {
+    xd_log(LOG_INFO, "Running in full mode with D-Bus");
+  }
+
   xs_handle = NULL;
   xsfd = xenstore_init();
   if (xsfd == -1)
     return -1;
 
-  /* Setup dbus */
-  rpc_init();
+  if (dbus) {
+    /* Setup dbus */
+    rpc_init();
 
-  /* Load the policy bits */
-  ret = policy_init();
-  if (ret != 0) {
-    xd_log(LOG_ERR, "Unable to initialize the policy bits");
-    return -1;
+    /* Load the policy bits */
+    ret = policy_init();
+    if (ret != 0) {
+      xd_log(LOG_ERR, "Unable to initialize the policy bits");
+      return -1;
+    }
+
+    /* Populate the VM list */
+    fill_vms();
   }
-
-  /* Populate the VM list */
-  fill_vms();
 
   /* Why would we do that? */
   /* Disable driver autoprobing */
@@ -153,8 +164,8 @@ main() {
     FD_ZERO(&writefds);
     FD_ZERO(&exceptfds);
 
-    FD_SET(xsfd, &readfds);
     FD_SET(udevfd, &readfds);
+    FD_SET(xsfd, &readfds);
     nfds = xsfd > udevfd ? xsfd : udevfd;
     nfds = nfds + 1;
 

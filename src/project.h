@@ -194,7 +194,7 @@ int   udev_device_tree_match(struct udev_device *dev,
     const char *value,
     int sysattr /* 1 for sysattr, 0 for property*/);
 
-void  libusb_find_more_about_nic(device_t *device);
+int   libusb_find_more_about_nic(int vendorid, int deviceid);
 
 device_t* device_lookup(int busid, int devid);
 device_t* device_lookup_by_attributes(int vendorid, int deviceid, char *serial);

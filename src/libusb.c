@@ -78,17 +78,18 @@ libusb_findDevice(int vendorid, int productid)
  * configurations, which can have multiple interfaces, which can have
  * multiple "altSettings," which can have multiple endpoints.
  */
-void
-libusb_find_more_about_nic(device_t *device)
+int
+libusb_find_more_about_nic(int vendorid, int deviceid)
 {
   int i, j, k;
+  int type = 0;
   int totalEndpoints = 0;
-  struct usb_device *libusb_device = libusb_findDevice(device->vendorid, device->deviceid);
+  struct usb_device *libusb_device = libusb_findDevice(vendorid, deviceid);
 
   if (!libusb_device)
   {
-    xd_log(LOG_WARNING, "Unable to find device with vendor ID %04x and device ID %04x. Was it removed?", device->vendorid, device->deviceid);
-    return;
+    xd_log(LOG_WARNING, "Unable to find device with vendor ID %04x and device ID %04x. Was it removed?", vendorid, deviceid);
+    return type;
   }
 
   for (i = 0; i < libusb_device->descriptor.bNumConfigurations; i++)
@@ -108,7 +109,7 @@ libusb_find_more_about_nic(device_t *device)
         if (totalEndpoints > MAX_ENDPOINTS)
         {
           xd_log(LOG_WARNING, "Aborting libusb_find_more_about_nic due to exceeding the endpoint limit");
-          return;
+          return type;
         }
 
         // TODO: some nics will be marked with the VENDOR_SPECIFIC class,
@@ -116,10 +117,12 @@ libusb_find_more_about_nic(device_t *device)
         // additional method is needed to properly ID these devices.
         if (libusb_is_ethernet_interface(interface_descriptor) ||
             libusb_is_wireless_interface(interface_descriptor))
-          device->type |= NIC;
+          type |= NIC;
         if (libusb_is_bluetooth_interface(interface_descriptor))
-          device->type |= BLUETOOTH;
+          type |= BLUETOOTH;
       }
     }
   }
+
+  return type;
 }

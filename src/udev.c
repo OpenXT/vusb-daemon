@@ -534,28 +534,20 @@ udev_node_to_ids(const char *node, int *busid, int *devid)
 }
 
 /**
- * Cleanup xenstore and delete a device after a udev removal event.
+ * Cleanup xenstore and delete a device after removal.
  *
- * @param dev Udev handle of the device
+ * @param busnum of device
+ * @param devnum of device
  *
  * @return 0 on success, 1 if nothing happened, -1 on failure
  */
 int
-udev_del_device(struct udev_device *dev)
+common_del_device(int busnum, int devnum)
 {
-  const char *node;
-  int busnum;
-  int devnum;
   usbinfo_t ui;
   dominfo_t di;
   device_t *device;
   int ret;
-
-  /* Find the bus and device IDs */
-  node = udev_device_get_devnode(dev);
-  if (node == NULL)
-    return -1;
-  udev_node_to_ids(node, &busnum, &devnum);
 
   /* Cleanup xenstore if the device was assigned to a VM */
   device = device_lookup(busnum, devnum);
@@ -577,6 +569,29 @@ udev_del_device(struct udev_device *dev)
     usbmanager_device_removed();
 
   return ret;
+}
+
+/**
+ * Cleanup xenstore and delete a device after a udev removal event.
+ *
+ * @param dev Udev handle of the device
+ *
+ * @return 0 on success, 1 if nothing happened, -1 on failure
+ */
+int
+udev_del_device(struct udev_device *dev)
+{
+  const char *node;
+  int busnum;
+  int devnum;
+
+  /* Find the bus and device IDs */
+  node = udev_device_get_devnode(dev);
+  if (node == NULL)
+    return -1;
+  udev_node_to_ids(node, &busnum, &devnum);
+
+  return common_del_device(busnum, devnum);
 }
 
 /**

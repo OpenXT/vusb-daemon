@@ -35,6 +35,8 @@
 char *xs_backend_path = NULL;
 int usb_backend_domid = 0;
 int my_domid = -1;
+char *watch_path;
+char *watch_token = "usb_dev_watch";
 
 static void*
 xmalloc(size_t size)
@@ -555,10 +557,17 @@ xenstore_init(const int backend_domid)
 int
 xenstore_new_backend(const int backend_domid)
 {
+  int ret;
   free(xs_backend_path);
   xs_backend_path = NULL;
 
-  return xenstore_init(backend_domid);
+  ret = xenstore_init(backend_domid);
+
+  /* Redo the watches! */
+  xsdev_watch_deinit();
+  xsdev_watch_init();
+
+  return ret;
 }
 
 /**
@@ -570,4 +579,163 @@ xenstore_deinit(void)
 {
   xs_daemon_close(xs_handle);
   xs_handle = NULL;
+}
+
+void
+xsdev_watch_deinit(void)
+{
+  if (watch_path) {
+    xs_unwatch(xs_handle, watch_path, watch_token);
+    free(watch_path);
+    watch_path = NULL;
+  }
+}
+
+int
+xsdev_watch_init(void)
+{
+  if (usb_backend_domid > 0) {
+    watch_path = xasprintf("%s/data/usb", xs_backend_path);
+    xs_watch(xs_handle, watch_path, watch_token);
+  }
+
+  return xs_fileno(xs_handle);
+}
+
+void
+xsdev_event_one(char *path)
+{
+  device_t *dev;
+  unsigned int len;
+  char *dev_path;
+  char *p;
+  int busid;
+  int devid;
+  int vendorid;
+  int deviceid;
+  char *serial;
+  char *shortname;
+  char *longname;
+  char *sysname;
+  int type;
+  int num;
+
+  dev_path = xs_read(xs_handle, 0, path, &len);
+  if (dev_path == NULL) {
+    /* Remove */
+  }
+  free(dev_path);
+
+  xs_transaction_t t;
+
+  xd_log(LOG_INFO, "xenstore event %s", path);
+
+  p = strrchr(path, '/');
+  if (p == NULL) {
+    xd_log(LOG_ERR, "%s could not find '/' path=%s", __func__, path);
+
+    return;
+  }
+  p++;
+
+  num = sscanf(p, "dev%d-%d", &busid, &devid);
+  if (num != 2) {
+    xd_log(LOG_DEBUG, "%s could not parse path=%s", __func__, path);
+
+    return;
+  }
+
+ restart:
+  t = xs_transaction_start(xs_handle);
+
+#define xs_read_int(v) { \
+  char *_path = xasprintf("%s/%s", path, #v); \
+  char *_p = xs_read(xs_handle, t, _path, &len); \
+  v = strtol(_p, NULL, 0); \
+  free(_p); \
+  free(_path); }
+
+  xs_read_int(busid);
+  xs_read_int(devid);
+  xs_read_int(vendorid);
+  xs_read_int(deviceid);
+  xs_read_int(type);
+
+#define xs_read_string(v) { \
+  char *_path = xasprintf("%s/%s", path, #v); \
+  v = xs_read(xs_handle, t, _path, &len); \
+  free(_path); }
+
+  xs_read_string(serial);
+  xs_read_string(shortname);
+  xs_read_string(longname);
+  xs_read_string(sysname);
+
+#undef xs_read_string
+#undef xs_read_int
+
+  if (xs_transaction_end(xs_handle, t, false) == false) {
+    if (errno == EAGAIN) {
+      goto restart;
+    }
+    xd_log(LOG_ERR, "%s xs_transaction_failed errno=%d (%s)",
+           __func__, errno, strerror(errno));
+    xs_transaction_end(xs_handle, t, true);
+
+    return;
+  }
+
+  if (shortname == NULL ||
+      longname == NULL ||
+      sysname == NULL ||
+      vendorid < 0 || vendorid > 0xffff ||
+      deviceid < 0 || deviceid > 0xffff ||
+      busid == 0 ||
+      devid == 0) {
+    xd_log(LOG_ERR, "%s: skipping invalid device", __func__);
+    return;
+  }
+
+  /* Add device */
+  xd_log(LOG_INFO, "%s adding device %d:%d", __func__, busid, devid);
+  dev = device_add(busid, devid, vendorid, deviceid, type, serial,
+                   shortname, longname, sysname, NULL);
+  if (dev == NULL) {
+    xd_log(LOG_INFO, "%s: device %d:%d already added", __func__, busid, devid);
+    return;
+  }
+}
+
+void
+xenstore_event()
+{
+  char **ret;
+
+  ret = xs_check_watch(xs_handle);
+  if (ret == NULL && errno == EAGAIN) {
+    return;
+  }
+
+  char *path = ret[XS_WATCH_PATH];
+  char *token = ret[XS_WATCH_TOKEN];
+
+  /* Ignore a watch event that doesn't have a child */
+  if (strcmp(watch_path, path) == 0) {
+    goto free_ret;
+  }
+
+  /* Ignore a watch event that doesn't have a child */
+  if (strcmp(watch_token, token) != 0) {
+    xd_log(LOG_ERR, "Unexpected token %s doesn't match our's (%s)",
+           token, watch_token);
+    goto free_ret;
+  }
+
+  xsdev_event_one(path);
+
+ free_ret:
+  free(ret);
+
+  /* We need to process all watch events, so recurse. */
+  xenstore_event();
 }

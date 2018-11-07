@@ -173,6 +173,7 @@ xcdbus_conn_t *g_xcbus;      /**< The global dbus (libxcdbus) handle, initialize
 vm_t vms;                    /**< The global list of VMs, handled by vm.c */
 device_t devices;            /**< The global list of devices, handled by device.c */
 struct udev *udev_handle;    /**< The global udev handle, initialized by udev_init() */
+extern int usb_backend_domid;
 
 int   usbowls_plug_device(int domid, int bus, int device);
 int   usbowls_unplug_device(int domid, int bus, int device);
@@ -225,6 +226,10 @@ void  xenstore_get_xb_states(dominfo_t *domp, usbinfo_t *usbp, int *frontst, int
 void  xenstore_list_domain_devs(dominfo_t *domp);
 int   xenstore_init(const int backend_domid);
 void  xenstore_deinit(void);
+void  xenstore_event(void);
+int   xenstore_new_backend(const int backend_domid);
+int   xsdev_watch_init(void);
+void  xsdev_watch_deinit(void);
 
 int   policy_init(void);
 void  policy_add_rule(rule_t *rule);

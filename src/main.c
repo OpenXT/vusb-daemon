@@ -70,6 +70,7 @@ main() {
   fd_set writefds;
   fd_set exceptfds;
   int nfds;
+  int xsfd;
   int udevfd;
 
   /* init libusb */
@@ -115,6 +116,11 @@ main() {
   /* Populate the USB device list */
   udev_fill_devices();
 
+  xsfd = xsdev_watch_init();
+  if (xsfd < 0) {
+    xd_log(LOG_ERR, "Unable to initialize xenstore device watch");
+  }
+
   /* Setup libusb */
   /* if (libusb_init(NULL) != 0) { */
   /*   xd_log(LOG_ERR, "Unable to initialize libusb"); */
@@ -128,14 +134,19 @@ main() {
     FD_ZERO(&writefds);
     FD_ZERO(&exceptfds);
 
+    FD_SET(xsfd, &readfds);
     FD_SET(udevfd, &readfds);
-    nfds = udevfd + 1;
+    nfds = xsfd > udevfd ? xsfd : udevfd;
+    nfds = nfds + 1;
 
     nfds = xcdbus_pre_select(g_xcbus, nfds, &readfds, &writefds, &exceptfds);
     ret = select(nfds, &readfds, &writefds, &exceptfds, NULL);
     xcdbus_post_select(g_xcbus, nfds, &readfds, &writefds, &exceptfds);
     if (ret > 0 && FD_ISSET(udevfd, &readfds))
       udev_event();
+
+    if (ret > 0 && FD_ISSET(xsfd, &readfds))
+      xenstore_event();
   }
 
   /* In the future, the while loop may break on critical error,

@@ -162,15 +162,27 @@ vm_del(const int domid)
       break;
     }
   }
-  if (vm != NULL && vm->domid == domid) {
-    xd_log(LOG_INFO, "Deleting vm, domid=%d, uuid=%s", vm->domid, vm->uuid);
-    list_del(pos);
-    free(vm->uuid);
-    free(vm);
-  } else {
+  if (vm == NULL || vm->domid != domid) {
     xd_log(LOG_ERR, "VM not found: %d", domid);
     return -1;
   }
+
+  xd_log(LOG_INFO, "Deleting vm, domid=%d, uuid=%s", vm->domid, vm->uuid);
+  list_del(pos);
+
+  /**
+   * XXX should we reset usb_backend_domid to 0 and let it pass through?
+   * or should we just set usb_backend_domid to -1 and await a new USBVM
+   * before continuing?  We fall back to dom0 for now.
+   */
+  if (domid == usb_backend_domid && strcmp(vm->uuid, USBVM_UUID) == 0) {
+    xd_log(LOG_WARNING, "Changing USB backend from %d to %d", usb_backend_domid,
+           0);
+    xenstore_new_backend(0);
+  }
+
+  free(vm->uuid);
+  free(vm);
 
   return 0;
 }

@@ -97,6 +97,22 @@ get_usbinfo(int bus, int dev, usbinfo_t *ui)
   struct udev_device *udev_dev;
   char bus_str[16], dev_str[16];
   int vendor, product;
+  device_t *device;
+
+  device = device_lookup(bus, dev);
+  if (device) {
+    int ret;
+
+    vendor = device->vendorid;
+    product = device->deviceid;
+
+    ret = usbowls_build_usbinfo(bus, dev, vendor, product, ui);
+    if (ret == 0) {
+      return ret;
+    }
+  }
+
+  xd_log(LOG_ERR, "%s: device_lookup failed, falling back to udev", __func__);
 
   enumerate = udev_enumerate_new(udev_handle);
   if (!enumerate) {

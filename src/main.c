@@ -66,7 +66,6 @@ static void fill_vms()
 int
 main() {
   int ret;
-  struct timeval tv;
   fd_set readfds;
   fd_set writefds;
   fd_set exceptfds;
@@ -125,18 +124,13 @@ main() {
     FD_ZERO(&readfds);
     FD_ZERO(&writefds);
     FD_ZERO(&exceptfds);
-    tv.tv_sec = 0;
-    tv.tv_usec = 1000;
-    nfds = xcdbus_pre_select(g_xcbus, 0, &readfds, &writefds, &exceptfds);
-    select(nfds, &readfds, &writefds, &exceptfds, &tv);
-    xcdbus_post_select(g_xcbus, 0, &readfds, &writefds, &exceptfds);
 
-    /* Check udev */
-    FD_ZERO(&readfds);
     FD_SET(udevfd, &readfds);
-    tv.tv_sec = 0;
-    tv.tv_usec = 1000;
-    ret = select(udevfd + 1, &readfds, NULL, NULL, &tv);
+    nfds = udevfd + 1;
+
+    nfds = xcdbus_pre_select(g_xcbus, nfds, &readfds, &writefds, &exceptfds);
+    ret = select(nfds, &readfds, &writefds, &exceptfds, NULL);
+    xcdbus_post_select(g_xcbus, nfds, &readfds, &writefds, &exceptfds);
     if (ret > 0 && FD_ISSET(udevfd, &readfds))
       udev_event();
   }

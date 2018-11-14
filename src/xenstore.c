@@ -37,6 +37,7 @@ int usb_backend_domid = 0;
 int my_domid = -1;
 char *watch_path;
 char *watch_token = "usb_dev_watch";
+#define ASSIGN_PREFIX "assign:"
 
 static void*
 xmalloc(size_t size)
@@ -618,7 +619,7 @@ void xsdev_del(device_t *dev)
   }
 
   char *vusb_watch = xasprintf("%s/assign", path);
-  char *vusb_token = xasprintf("assign:%x %x", dev->vendorid,
+  char *vusb_token = xasprintf(ASSIGN_PREFIX"%x %x", dev->vendorid,
                  dev->deviceid);
 
   xs_unwatch(xs_handle, vusb_watch, vusb_token);
@@ -700,6 +701,17 @@ void xsdev_write(device_t *dev)
     xs_transaction_end(xs_handle, t, true);
   }
 
+  char *vusb_watch = xasprintf("%s/assign", path);
+  char *vusb_token = xasprintf("assign:%x %x", dev->vendorid,
+                 dev->deviceid);
+
+  if (xs_watch(xs_handle, vusb_watch, vusb_token) == false) {
+    xd_log(LOG_ERR, "%s failed to add %s xs_watch", __func__,
+           vusb_watch);
+  }
+
+  free(vusb_watch);
+  free(vusb_token);
   free(path);
 }
 
@@ -891,19 +903,19 @@ xenstore_event()
   char *path = ret[XS_WATCH_PATH];
   char *token = ret[XS_WATCH_TOKEN];
 
-  /* Ignore a watch event that doesn't have a child */
-  if (strcmp(watch_path, path) == 0) {
-    goto free_ret;
-  }
+  if (strcmp(watch_token, token) == 0) {
+    /* Ignore a watch event that doesn't have a child */
+    if (watch_path == NULL || strcmp(watch_path, path) == 0) {
+      goto free_ret;
+    }
 
-  /* Ignore a watch event that doesn't have a child */
-  if (strcmp(watch_token, token) != 0) {
+    xsdev_event_one(path);
+  } else if (strncmp(token, ASSIGN_PREFIX, strlen(ASSIGN_PREFIX)) == 0) {
+    xsdev_assigning(path, token);
+  } else {
     xd_log(LOG_ERR, "Unexpected token %s doesn't match our's (%s)",
            token, watch_token);
-    goto free_ret;
   }
-
-  xsdev_event_one(path);
 
  free_ret:
   free(ret);

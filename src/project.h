@@ -175,6 +175,7 @@ device_t devices;            /**< The global list of devices, handled by device.
 struct udev *udev_handle;    /**< The global udev handle, initialized by udev_init() */
 extern int usb_backend_domid;
 
+int   vusb_assign_local(int vendor, int product, int add);
 int   usbowls_plug_device(int domid, int bus, int device);
 int   usbowls_unplug_device(int domid, int bus, int device);
 int   usbowls_build_usbinfo(int bus, int dev, int vendor, int product, usbinfo_t *ui);
@@ -234,6 +235,9 @@ int   xsdev_watch_init(void);
 void  xsdev_watch_deinit(void);
 void  xsdev_write(device_t *dev);
 void  xsdev_del(device_t *dev);
+
+char *xasprintf(const char *fmt, ...);
+extern char *xs_backend_path;
 
 int   policy_init(void);
 void  policy_add_rule(rule_t *rule);

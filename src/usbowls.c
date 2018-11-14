@@ -34,13 +34,15 @@
 #define VUSB_ADD_DEV            "/sys/bus/usb/drivers/vusb/new_id"
 #define VUSB_DEL_DEV            "/sys/bus/usb/drivers/vusb/remove_id"
 
-static int
-vusb_assign(int vendor, int product, int add)
+int
+vusb_assign_local(int vendor, int product, int add)
 {
   char command[64];
   int fd;
   int ret = 0;
   char *path = add ? VUSB_ADD_DEV : VUSB_DEL_DEV;
+
+  xd_log(LOG_INFO, "%s: %04x:%04x add=%d", __func__, vendor, product, add);
 
   fd = open(path, O_WRONLY);
   if (fd == -1) {
@@ -56,6 +58,45 @@ vusb_assign(int vendor, int product, int add)
     ret = -1;
 
   return (ret);
+}
+
+static int
+vusb_assign_remote(int vendor, int product, int bus, int dev, int add)
+{
+  char add_str[] = "0";
+  char *path;
+  int ret;
+
+  xd_log(LOG_INFO, "%s: %04x:%04x %d-%d add=%d", __func__, vendor, product,
+         bus, dev, add);
+
+  /* Set to either "0" or "1" */
+  add_str[0] += (add == 1);
+
+  path = xasprintf("%s/data/usb/dev%x-%x/assign", xs_backend_path, bus, dev);
+
+  ret = xs_write(xs_handle, XBT_NULL, path, add_str, strlen(add_str));
+
+  free(path);
+
+  /* xs_write returns true for success, but we need 0 here */
+  if (ret) {
+    ret = 0;
+  } else {
+    ret = -1;
+  }
+
+  return ret;
+}
+
+static int
+vusb_assign(int vendor, int product, int bus, int dev, int add)
+{
+  if (usb_backend_domid > 0) {
+    return vusb_assign_remote(vendor, product, bus, dev, add);
+  } else {
+    return vusb_assign_local(vendor, product, add);
+  }
 }
 
 /**
@@ -192,7 +233,7 @@ usbowls_plug_device(int domid, int bus, int device)
   if (xenstore_wait_for_online(&di, &ui) < 0)
     xd_log(LOG_ERR, "The frontend or the backend didn't go online, continue anyway");
 
-  ret = vusb_assign(ui.usb_vendor, ui.usb_product, 1);
+  ret = vusb_assign(ui.usb_vendor, ui.usb_product, bus, device, 1);
   if (ret != 0) {
     xd_log(LOG_ERR, "Failed to assign device");
     xenstore_destroy_usb(&di, &ui);
@@ -231,7 +272,7 @@ usbowls_unplug_device(int domid, int bus, int device)
     return 1;
   }
 
-  ret = vusb_assign(ui.usb_vendor, ui.usb_product, 0);
+  ret = vusb_assign(ui.usb_vendor, ui.usb_product, bus, device, 0);
   if (ret != 0) {
     xd_log(LOG_ERR, "Failed to unassign device");
     return 1;

@@ -55,7 +55,7 @@ xmalloc(size_t size)
  * Allocating formatted string print.
  * The caller is responsible for returning the returned string.
  */
-static char *
+char *
 xasprintf(const char *fmt, ...)
 {
   char *s;
@@ -835,6 +835,47 @@ xsdev_event_one(char *path)
     xd_log(LOG_INFO, "%s: device %d:%d already added", __func__, busid, devid);
     return;
   }
+}
+
+void xsdev_assigning(char *path, char *token)
+{
+  int vid, pid;
+  int num;
+  unsigned int len;
+  int add;
+  char *val;
+
+  xd_log(LOG_INFO, "%s: path=%s token=%s", __func__, path, token);
+
+  num = sscanf(token, "assign:%x %x", &vid, &pid);
+  if (num != 2) {
+    xd_log(LOG_ERR, "%s: Unexpected token %s", __func__, token);
+    return;
+  }
+
+  val = xs_read(xs_handle, XBT_NULL, path, &len);
+  if (val == NULL) {
+    xd_log(LOG_INFO, "%s: xs_read(%s)=NULL %04x:%04x", __func__,
+           path, vid, pid);
+    return;
+  }
+
+  if (strcmp(val, "1") == 0) {
+    add = 1;
+  } else if (strcmp(val, "0") == 0) {
+    add = 0;
+  } else {
+    xd_log(LOG_ERR, "%s: unexpected val='%s'", __func__, val);
+    goto out;
+  }
+
+  xd_log(LOG_INFO, "%s: val=%s %s %x:%x", __func__, val,
+         add ? "adding" : "removing", vid, pid);
+
+  vusb_assign_local(vid, pid, add);
+
+ out:
+  free(val);
 }
 
 void

@@ -515,11 +515,6 @@ udev_maybe_add_device(struct udev_device *dev, int auto_assign)
                       serial,
                       model, vendor,
                       sysname, dev);
-  if (device == NULL)
-    return NULL;
-
-  if (auto_assign > 0)
-    policy_auto_assign_new_device(device);
 
   if (device) {
     xsdev_write(device);
@@ -656,6 +651,7 @@ udev_event(void)
   struct udev_device *dev;
   const char *action;
   device_t *device;
+  int auto_assign = my_domid == 0;
 
   dev = udev_monitor_receive_device(udev_mon);
   if (dev) {
@@ -675,6 +671,9 @@ udev_event(void)
             device->vendorid,
             device->deviceid,
             device->serial);
+
+        if (auto_assign)
+          policy_auto_assign_new_device(device);
       } else {
         /* This seems to happen when a device is quickly plugged and
          * unplugged. */

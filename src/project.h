@@ -174,6 +174,7 @@ vm_t vms;                    /**< The global list of VMs, handled by vm.c */
 device_t devices;            /**< The global list of devices, handled by device.c */
 struct udev *udev_handle;    /**< The global udev handle, initialized by udev_init() */
 extern int usb_backend_domid;
+extern int my_domid;
 
 int   vusb_assign_local(int vendor, int product, int add);
 int   usbowls_plug_device(int domid, int bus, int device);

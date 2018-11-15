@@ -285,7 +285,8 @@ xenstore_create_usb(dominfo_t *domp, usbinfo_t *usbp)
     /*
      * Populate frontend device info
      */
-    if (xenstore_set_keyval(trans, fepath, "backend-id", "0"))
+    snprintf(value, sizeof(value), "%d", usb_backend_domid);
+    if (xenstore_set_keyval(trans, fepath, "backend-id", value))
       break;
     snprintf(value, sizeof (value), "%d", usbp->usb_virtid);
     if (xenstore_set_keyval(trans, fepath, "virtual-device", value))

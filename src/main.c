@@ -63,6 +63,26 @@ static void fill_vms()
   g_ptr_array_free(paths, TRUE);
 }
 
+int dbus_pre_select(int nfds, fd_set *readfds, fd_set *writefds,
+                    fd_set *exceptfds)
+{
+  if (g_xcbus == NULL) {
+    return nfds;
+  }
+
+  return xcdbus_pre_select(g_xcbus, nfds, readfds, writefds, exceptfds);
+}
+
+void dbus_post_select(int nfds, fd_set *readfds, fd_set *writefds,
+                     fd_set *exceptfds)
+{
+  if (g_xcbus == NULL) {
+    return;
+  }
+
+  xcdbus_post_select(g_xcbus, nfds, readfds, writefds, exceptfds);
+}
+
 int
 main() {
   int ret;
@@ -138,9 +158,10 @@ main() {
     nfds = xsfd > udevfd ? xsfd : udevfd;
     nfds = nfds + 1;
 
-    nfds = xcdbus_pre_select(g_xcbus, nfds, &readfds, &writefds, &exceptfds);
+    nfds = dbus_pre_select(nfds, &readfds, &writefds, &exceptfds);
     ret = select(nfds, &readfds, &writefds, &exceptfds, NULL);
-    xcdbus_post_select(g_xcbus, nfds, &readfds, &writefds, &exceptfds);
+    dbus_post_select(nfds, &readfds, &writefds, &exceptfds);
+
     if (ret > 0 && FD_ISSET(udevfd, &readfds))
       udev_event();
 

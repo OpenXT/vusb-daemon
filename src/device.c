@@ -172,6 +172,17 @@ device_add(int  busid, int  devid,
   return device;
 }
 
+void device_free(device_t *device)
+{
+  free(device->shortname);
+  free(device->longname);
+  free(device->sysname);
+  free(device->serial);
+  /* udev_device_unref is okay when udev is NULL */
+  udev_device_unref(device->udev);
+  free(device);
+}
+
 /**
  * Remove a device from the global list of devices
  *
@@ -195,11 +206,7 @@ device_del(int  busid,
   }
   if (device != NULL && device->busid == busid && device->devid == devid) {
     list_del(pos);
-    free(device->shortname);
-    free(device->longname);
-    free(device->sysname);
-    udev_device_unref(device->udev);
-    free(device);
+    device_free(device);
   } else {
     xd_log(LOG_ERR, "Device not found: %d-%d", busid, devid);
     return -1;

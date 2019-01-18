@@ -139,6 +139,8 @@ dump_rules(void)
       printf("default\n");
     else if (rule->cmd == ALLOW)
       printf("allow\n");
+    else if (rule->cmd == RUNNING)
+      printf("running\n");
     else if (rule->cmd == DENY)
       printf("deny\n");
     printf("  pos        %d\n", rule->pos);
@@ -255,8 +257,26 @@ vm_matches_rule(rule_t *rule, vm_t *vm)
   return true;
 }
 
+static bool
+rule_vm_running(rule_t *rule)
+{
+  vm_t *vm;
+
+  /* If no VM UUID, then we never match */
+  if (rule->vm_uuid == NULL)
+    return false;
+
+  /* Lookup the VM */
+  vm = vm_lookup_by_uuid(rule->vm_uuid);
+  if (vm == NULL)
+    return false;
+
+  /* Is the vm running */
+  return vm->domid > 0;
+}
+
 static rule_t*
-rule_lookup(device_t *device, enum command cmd)
+_rule_lookup(device_t *device, enum command cmd, bool check_vm_running)
 {
   struct list_head *pos;
   rule_t *rule;
@@ -265,11 +285,30 @@ rule_lookup(device_t *device, enum command cmd)
     rule = list_entry(pos, rule_t, list);
     if (rule->cmd == cmd &&
         device_matches_rule(rule, device)) {
-      return rule;
+      if (check_vm_running) {
+        if (rule_vm_running(rule)) {
+          return rule;
+        }
+        /* continue */
+      } else {
+        return rule;
+      }
     }
   }
 
   return NULL;
+}
+
+static rule_t *
+rule_lookup(device_t *device, enum command cmd)
+{
+  return _rule_lookup(device, cmd, false);
+}
+
+static rule_t *
+rule_lookup_running(device_t *device, enum command cmd)
+{
+  return _rule_lookup(device, cmd, true);
 }
 
 static rule_t*
@@ -282,6 +321,12 @@ static rule_t*
 default_lookup(device_t *device)
 {
   return rule_lookup(device, DEFAULT);
+}
+
+static rule_t*
+running_lookup(device_t *device)
+{
+  return rule_lookup_running(device, RUNNING);
 }
 
 void
@@ -550,6 +595,8 @@ policy_auto_assign_new_device(device_t *device)
   rule = sticky_lookup(device);
   if (rule == NULL)
     rule = default_lookup(device);
+  if (rule == NULL)
+    rule = running_lookup(device);
   if (rule != NULL) {
     vm = vm_lookup_by_uuid(rule->vm_uuid);
   } else {
@@ -603,7 +650,7 @@ policy_auto_assign_devices_to_new_vm(vm_t *vm)
    * assign all devices that match the rule to the VM */
   list_for_each_safe(pos, tmp, &rules.list) {
     rule = list_entry(pos, rule_t, list);
-    if ((rule->cmd == ALWAYS || rule->cmd == DEFAULT) &&
+    if ((rule->cmd == ALWAYS || rule->cmd == DEFAULT || rule->cmd == RUNNING) &&
        rule->vm_uuid != NULL && /* NULL vm_uuid means dom0, means no assignment */
        !strcmp(rule->vm_uuid, vm->uuid)) {
       list_for_each(device_pos, &devices.list) {
@@ -671,6 +718,7 @@ policy_parse_command_string(const char* cmd)
   if (strcasecmp(cmd, "always") == 0) return ALWAYS;
   if (strcasecmp(cmd, "default") == 0) return DEFAULT;
   if (strcasecmp(cmd, "deny") == 0) return DENY;
+  if (strcasecmp(cmd, "running") == 0) return RUNNING;
 
   return UNKNOWN;
 }
@@ -689,6 +737,9 @@ policy_parse_command_enum(enum command cmd)
       break;
     case DEFAULT:
       strcpy(command, "default");
+      break;
+    case RUNNING:
+      strcpy(command, "running");
       break;
     default:
       strcpy(command, "deny");

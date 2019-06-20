@@ -59,38 +59,38 @@ AC_C_CONST
 PKG_CHECK_MODULES([LIBUSB], [libusb])
 PKG_CHECK_MODULES([DBUS],[dbus-1])
 PKG_CHECK_MODULES([DBUS_GLIB],[dbus-glib-1])
-PKG_CHECK_MODULES([LIBV4V],[libv4v])
+PKG_CHECK_MODULES([LIBARGO],[libargo])
 PKG_CHECK_MODULES([UDEV],[libudev])
 # Uncomment this for libxcxenstore
 # PKG_CHECK_MODULES([LIBXCXENSTORE],[libxcxenstore])
 
-LIBV4V_CONFIG=no
-AC_ARG_WITH(libv4v,
-        AC_HELP_STRING([--with-libv4v=PATH],[Path to libv4v-config]),
-                LIBV4V_CONFIG=$with_libv4v,LIBV4V_CONFIG=no)
+LIBARGO_CONFIG=no
+AC_ARG_WITH(libargo,
+        AC_HELP_STRING([--with-libargo=PATH],[Path to libargo-config]),
+                LIBARGO_CONFIG=$with_libargo,LIBARGO_CONFIG=no)
 
-case "x$LIBV4V_CONFIG" in
+case "x$LIBARGO_CONFIG" in
         xno)
-                AC_PATH_PROG(LIBV4V_CONFIG, libv4v-config, no)
+                AC_PATH_PROG(LIBARGO_CONFIG, libargo-config, no)
         ;;
         x|xyes)
-                AC_PATH_PROG(LIBV4V_CONFIG, libv4v-config, no)
+                AC_PATH_PROG(LIBARGO_CONFIG, libargo-config, no)
         ;;
         *)
         ;;
 esac
 
-if ! test -x $LIBV4V_CONFIG; then
-  PKG_CHECK_MODULES([LIBV4V], [libv4v])
-  LIBV4V_INC="$LIBV4V_CFLAGS"
-  LIBV4V_LIB="$LIBV4V_LIBS"
+if ! test -x $LIBARGO_CONFIG; then
+  PKG_CHECK_MODULES([LIBARGO], [libargo])
+  LIBARGO_INC="$LIBARGO_CFLAGS"
+  LIBARGO_LIB="$LIBARGO_LIBS"
 else
- LIBV4V_INC=`$LIBV4V_CONFIG --cflags`
- LIBV4V_LIB=`$LIBV4V_CONFIG --libs`
+ LIBARGO_INC=`$LIBARGO_CONFIG --cflags`
+ LIBARGO_LIB=`$LIBARGO_CONFIG --libs`
 fi
 
-AC_SUBST(LIBV4V_INC)
-AC_SUBST(LIBV4V_LIB)
+AC_SUBST(LIBARGO_INC)
+AC_SUBST(LIBARGO_LIB)
 
 LIBXCDBUS_CONFIG=no
 AC_ARG_WITH(libxcdbus,

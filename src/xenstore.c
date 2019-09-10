@@ -275,11 +275,11 @@ xenstore_create_usb(dominfo_t *domp, usbinfo_t *usbp)
     /*
      * Make directories for both front and back ends
      */
-    if (xenstore_add_dir(trans, bepath, 0, XS_PERM_NONE, domp->di_domid,
-                         XS_PERM_READ))
+    if (xenstore_add_dir(trans, bepath, usb_backend_domid, XS_PERM_NONE,
+                         domp->di_domid, XS_PERM_READ))
       break;
-    if (xenstore_add_dir(trans, fepath, domp->di_domid, XS_PERM_NONE, 0,
-                         XS_PERM_READ))
+    if (xenstore_add_dir(trans, fepath, domp->di_domid, XS_PERM_NONE,
+                         usb_backend_domid, XS_PERM_READ))
       break;
 
     /*

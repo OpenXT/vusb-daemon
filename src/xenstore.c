@@ -27,12 +27,14 @@
  */
 
 #include "project.h"
+#include <xen/xen.h>
 
 /**
  * The xenstore USB backend domain path, set by xenstore_init()
  */
 char *xs_backend_path = NULL;
 int usb_backend_domid = 0;
+int my_domid = -1;
 
 static void*
 xmalloc(size_t size)
@@ -507,6 +509,9 @@ xenstore_destroy_usb(dominfo_t *domp, usbinfo_t *usbp)
 int
 xenstore_init(const int backend_domid)
 {
+  unsigned int len;
+  char *domid_str, *endptr;
+
   if (xs_handle == NULL) {
     xs_handle = xs_daemon_open();
   }
@@ -526,6 +531,23 @@ xenstore_init(const int backend_domid)
   }
 
   usb_backend_domid = backend_domid;
+
+  domid_str = xs_read(xs_handle, XBT_NULL, "domid", &len);
+  if (domid_str == NULL) {
+    xd_log(LOG_ERR, "Failed to read domid");
+    return 1;
+  }
+
+  my_domid = strtol(domid_str, &endptr, 10);
+  if (my_domid < 0 || my_domid >= DOMID_FIRST_RESERVED || endptr[0] != '\0') {
+    xd_log(LOG_ERR, "domid string '%s' is not a valid number", domid_str);
+    free(domid_str);
+    return 1;
+  }
+
+  xd_log(LOG_INFO, "Running in domain %d", my_domid);
+
+  free(domid_str);
 
   return 0;
 }

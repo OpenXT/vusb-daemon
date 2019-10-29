@@ -357,11 +357,8 @@ udev_maybe_add_device(struct udev_device *dev, int auto_assign)
   value = udev_device_get_sysname(dev);
   if (value == NULL)
     return NULL;
-  else {
-    size = strlen(value) + 1;
-    sysname = malloc(size);
-    strncpy(sysname, value, size);
-  }
+  else
+    sysname = strdup(value);
 
   /* This is a hub, we don't do hubs. */
   if (class == 0x09)

@@ -226,7 +226,7 @@ char* xenstore_dom_read (unsigned int domid, const char *format, ...);
 int   xenstore_get_dominfo(int domid, dominfo_t *di);
 void  xenstore_get_xb_states(dominfo_t *domp, usbinfo_t *usbp, int *frontst, int *backst);
 void  xenstore_list_domain_devs(dominfo_t *domp);
-int   xenstore_init(const int backend_domid);
+int   xenstore_init(void);
 void  xenstore_deinit(void);
 void  xenstore_event(void);
 int   xenstore_new_backend(const int backend_domid);

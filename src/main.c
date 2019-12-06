@@ -80,7 +80,6 @@ main() {
   INIT_LIST_HEAD(&vms.list);
   INIT_LIST_HEAD(&devices.list);
 
-  /* Initialize xenstore handle in usbowls */
   xs_handle = NULL;
   ret = xenstore_init();
   if (ret != 0)

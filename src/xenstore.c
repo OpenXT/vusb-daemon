@@ -509,7 +509,7 @@ xenstore_destroy_usb(dominfo_t *domp, usbinfo_t *usbp)
  * @return 0 on success, 1 on failure
  */
 int
-xenstore_init(const int backend_domid)
+xenstore_init()
 {
   unsigned int len;
   char *domid_str, *endptr;
@@ -523,16 +523,7 @@ xenstore_init(const int backend_domid)
     return 1;
   }
 
-  if (xs_backend_path == NULL) {
-    xs_backend_path = xs_get_domain_path(xs_handle, backend_domid);
-  }
-
-  if (xs_backend_path == NULL) {
-    xd_log(LOG_ERR, "Could not get backend path from XenStore");
-    return 1;
-  }
-
-  usb_backend_domid = backend_domid;
+  xs_backend_path = xs_get_domain_path(xs_handle, usb_backend_domid);
 
   domid_str = xs_read(xs_handle, XBT_NULL, "domid", &len);
   if (domid_str == NULL) {
@@ -558,10 +549,18 @@ int
 xenstore_new_backend(const int backend_domid)
 {
   int ret;
-  free(xs_backend_path);
-  xs_backend_path = NULL;
 
-  ret = xenstore_init(backend_domid);
+  if (backend_domid != usb_backend_domid) {
+    free(xs_backend_path);
+    xs_backend_path = xs_get_domain_path(xs_handle, backend_domid);
+
+    if (xs_backend_path == NULL) {
+      xd_log(LOG_ERR, "Could not get backend path from XenStore");
+      return 1;
+    }
+
+    usb_backend_domid = backend_domid;
+  }
 
   /* Redo the watches! */
   xsdev_watch_deinit();

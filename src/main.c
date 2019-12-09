@@ -81,9 +81,9 @@ main() {
   INIT_LIST_HEAD(&devices.list);
 
   xs_handle = NULL;
-  ret = xenstore_init();
-  if (ret != 0)
-    return ret;
+  xsfd = xenstore_init();
+  if (xsfd == -1)
+    return -1;
 
   /* Setup dbus */
   rpc_init();
@@ -115,8 +115,8 @@ main() {
   /* Populate the USB device list */
   udev_fill_devices();
 
-  xsfd = xsdev_watch_init();
-  if (xsfd < 0) {
+  ret = xsdev_watch_init();
+  if (ret == 0) {
     xd_log(LOG_ERR, "Unable to initialize xenstore device watch");
   }
 

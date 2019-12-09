@@ -506,7 +506,7 @@ xenstore_destroy_usb(dominfo_t *domp, usbinfo_t *usbp)
 /**
  * Initialize the xenstore bits
  *
- * @return 0 on success, 1 on failure
+ * @return xenstorefd (>= 0) on success, -1 on failure
  */
 int
 xenstore_init()
@@ -520,7 +520,7 @@ xenstore_init()
 
   if (xs_handle == NULL) {
     xd_log(LOG_ERR, "Failed to connect to xenstore");
-    return 1;
+    return -1;
   }
 
   xs_backend_path = xs_get_domain_path(xs_handle, usb_backend_domid);
@@ -528,21 +528,21 @@ xenstore_init()
   domid_str = xs_read(xs_handle, XBT_NULL, "domid", &len);
   if (domid_str == NULL) {
     xd_log(LOG_ERR, "Failed to read domid");
-    return 1;
+    return -1;
   }
 
   my_domid = strtol(domid_str, &endptr, 10);
   if (my_domid < 0 || my_domid >= DOMID_FIRST_RESERVED || endptr[0] != '\0') {
     xd_log(LOG_ERR, "domid string '%s' is not a valid number", domid_str);
     free(domid_str);
-    return 1;
+    return -1;
   }
 
   xd_log(LOG_INFO, "Running in domain %d", my_domid);
 
   free(domid_str);
 
-  return 0;
+  return xs_fileno(xs_handle);
 }
 
 int
@@ -590,15 +590,16 @@ xsdev_watch_deinit(void)
   }
 }
 
+/* Returns true (1) on success, false (0) on failure. */
 int
 xsdev_watch_init(void)
 {
   if (usb_backend_domid > 0) {
     watch_path = xasprintf("%s/data/usb", xs_backend_path);
-    xs_watch(xs_handle, watch_path, watch_token);
+    return xs_watch(xs_handle, watch_path, watch_token);
   }
 
-  return xs_fileno(xs_handle);
+  return 1;
 }
 
 void xsdev_del(device_t *dev)

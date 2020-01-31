@@ -151,6 +151,11 @@ main(int argc, char *argv[]) {
     xd_log(LOG_ERR, "Unable to initialize xenstore device watch");
   }
 
+  ret = xsdev_fill();
+  if (ret == 0) {
+    xd_log(LOG_ERR, "Unable to populate devices from xenstore");
+  }
+
   /* Setup libusb */
   /* if (libusb_init(NULL) != 0) { */
   /*   xd_log(LOG_ERR, "Unable to initialize libusb"); */

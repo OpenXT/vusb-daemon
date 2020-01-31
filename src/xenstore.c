@@ -744,11 +744,10 @@ void xsdev_remove(char *path)
 }
 
 void
-xsdev_event_one(char *path)
+xsdev_add(char *path)
 {
   device_t *dev;
   unsigned int len;
-  char *dev_path;
   char *p;
   int busid;
   int devid;
@@ -761,13 +760,6 @@ xsdev_event_one(char *path)
   int type;
   int num;
 
-  dev_path = xs_read(xs_handle, 0, path, &len);
-  if (dev_path == NULL) {
-    xsdev_remove(path);
-
-    return;
-  }
-  free(dev_path);
 
   xs_transaction_t t;
 
@@ -850,6 +842,54 @@ xsdev_event_one(char *path)
 
   /* We always auto-assign when the devices come through XenStore */
   policy_auto_assign_new_device(dev);
+}
+
+void
+xsdev_event_one(char *path)
+{
+  unsigned int len;
+  char *dev_path;
+
+  dev_path = xs_read(xs_handle, 0, path, &len);
+  if (dev_path == NULL) {
+    xsdev_remove(path);
+
+    return;
+  }
+  free(dev_path);
+
+  xsdev_add(path);
+}
+
+int xsdev_fill()
+{
+  char **nodes;
+  unsigned int num;
+
+  if (watch_path == NULL) {
+    return 1;
+  }
+
+  nodes = xs_directory(xs_handle, XBT_NULL, watch_path, &num);
+  if (nodes == NULL) {
+    xd_log(LOG_ERR, "%s: failed to read xs_directory %s", __func__,
+           xs_backend_path);
+    return 0;
+  }
+
+  for (int i = 0; i < num; i++) {
+    char *path;
+
+    path = xasprintf("%s/%s", watch_path, nodes[i]);
+
+    xsdev_add(path);
+
+    free(path);
+  }
+
+  free(nodes);
+
+  return 1;
 }
 
 void xsdev_assigning(char *path, char *token)

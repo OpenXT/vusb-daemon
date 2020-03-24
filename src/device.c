@@ -84,6 +84,44 @@ device_lookup_by_attributes(int vendorid,
 }
 
 /**
+ * Check managed devices for ambiguous matches
+ *
+ * @param device The device to check for ambiguity
+ *
+ * @return 0 if not ambiguous, 1 if ambiguous or error
+ */
+int
+device_is_ambiguous(device_t *device)
+{
+  struct list_head *pos;
+  device_t *dev;
+
+  if (device == NULL) return 1;
+
+  list_for_each(pos, &devices.list){
+    dev = list_entry(pos, device_t, list);
+    if (dev == NULL) continue;
+
+    /* Skip if we are at the given device */
+    if (dev->busid == device->busid && dev->devid == device->devid) continue;
+
+    /* Match vendor and product(device) IDs */
+    if (dev->vendorid == device->vendorid && dev->deviceid == device->deviceid){
+      /* If either device had an unpopulated serial, treat as ambiguous */
+      if (dev->serial == NULL || device->serial == NULL) return 1;
+
+      /* 0-length or empty string as serial can still result in ambiguity */
+      if (strlen(dev->serial) == 0 || strlen(device->serial) == 0) return 1;
+
+      /* Compare serial numbers. Shouldn't match, but has been seen before */
+      if (strncmp(dev->serial, device->serial, 256) == 0) return 1;
+    }
+  }
+
+  return 0;
+}
+
+/**
  * Add a new device to the global list of devices
  *
  * @param busid The device bus ID

@@ -184,6 +184,7 @@ void  udev_fill_devices(void);
 
 device_t* device_lookup(int busid, int devid);
 device_t* device_lookup_by_attributes(int vendorid, int deviceid, char *serial);
+int       device_is_ambiguous(device_t* device);
 device_t* device_add(int busid, int devid, int vendorid, int deviceid, char* serial,
                      char *shortname, char *longname, char *sysname, struct udev_device *udev);
 int       device_del(int  busid, int  devid);

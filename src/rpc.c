@@ -422,8 +422,15 @@ gboolean ctxusb_daemon_set_sticky(CtxusbDaemonObject *this,
 
   if (IN_sticky == 0)
     policy_unset_sticky(IN_dev_id);
-  else
-    policy_set_sticky(IN_dev_id);
+  else {
+    if (policy_set_sticky(IN_dev_id) == 1){
+      g_set_error(error,
+                DBUS_GERROR,
+                DBUS_GERROR_FAILED,
+                "Device %d is ambiguous, failed to set as sticky", IN_dev_id);
+    return FALSE;
+    }
+  }
 
   return TRUE;
 }

@@ -214,7 +214,10 @@ default_lookup(device_t *device)
  *
  * @param dev The device single ID
  *
- * @return 0 if the device was found and assigned to a VM, -1 otherwise
+ * @return
+ *  0 if the device was found and assigned to a VM,
+ *  1 if the device is ambiguous,
+ *  -1 otherwise
  */
 int
 policy_set_sticky(int dev)
@@ -229,6 +232,15 @@ policy_set_sticky(int dev)
   device = device_lookup(busid, devid);
   if (device == NULL || device->vm == NULL)
     return -1;
+  /* Do not set sticky for ambiguous devices */
+  if (device_is_ambiguous(device))
+  {
+    xd_log(LOG_INFO,
+        "Not setting sticky for device: Bus=%d Dev=%d",
+        busid,
+        devid);
+    return 1;
+  }
   new_rule = malloc(sizeof(rule_t));
   memset(new_rule, 0, sizeof(rule_t));
   new_rule->pos = 1000;
@@ -348,6 +360,18 @@ policy_auto_assign_new_device(device_t *device)
   int uivm;
   int res = 1;
 
+  if (device == NULL) return 1;
+
+  /* Don't auto assign ambiguous devices */
+  if (device_is_ambiguous(device))
+  {
+    xd_log(LOG_INFO,
+        "Rejecting automatic assignment of ambiguous device: Bus=%d Dev=%d",
+        device->busid,
+        device->devid);
+    return 1;
+  }
+
   /* If there's a sticky/default rule for the device, assign it to the
    * corresponding VM (if it's running). If there's no sticky/default rule
    * for the device, consider assigning it to the focused VM */
@@ -388,14 +412,15 @@ policy_auto_assign_new_device(device_t *device)
 int
 policy_auto_assign_devices_to_new_vm(vm_t *vm)
 {
-  struct list_head *pos, *device_pos;
+  struct list_head *pos, *device_pos, *tmp;
   rule_t *rule;
   device_t *device;
   int ret = 0;
+  int clean = 0;
 
   /* For all the ALWAYS and DEFAULT rules that match the VM,
    * assign all devices that match the rule to the VM */
-  list_for_each(pos, &rules.list) {
+  list_for_each_safe(pos, tmp, &rules.list) {
     rule = list_entry(pos, rule_t, list);
     if ((rule->cmd == ALWAYS || rule->cmd == DEFAULT) &&
        rule->vm_uuid != NULL && /* NULL vm_uuid means dom0, means no assignment */
@@ -416,12 +441,31 @@ policy_auto_assign_devices_to_new_vm(vm_t *vm)
             continue;
           }
         } else {
+          /* Don't auto assign ambiguous devices */
+          if (device_is_ambiguous(device))
+          {
+            xd_log(LOG_INFO,
+                "Skipping automatic assignment of ambiguous device: Bus=%d Dev=%d, rule %d will be removed",
+                device->busid,
+                device->devid,
+                rule->pos);
+            clean = 1;
+            continue;
+          }
+
           /* The device is not assigned, as expected, plug it to its VM */
           /* No need to check the policy, ALWAYS implies ALLOW */
           device->vm = vm;
           ret |= -usbowls_plug_device(vm->domid, device->busid, device->devid);
         }
       }
+    }
+    /* Cleanse rule because UI thinks unassigned devices are attached due to
+     * sticky association */
+    if (clean == 1){
+      list_del(&rule->list);
+      db_write_policy(&rules);
+      clean = 0;
     }
   }
 

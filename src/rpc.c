@@ -113,32 +113,6 @@ add_vm(int domid)
   return res;
 }
 
-gboolean ctxusb_daemon_set_policy_domuuid(
-  CtxusbDaemonObject *this,
-  const char *uuid,
-  const char *policy, GError **error)
-{
-  g_set_error(error,
-              DBUS_GERROR,
-              DBUS_GERROR_FAILED,
-              "set_policy_domuuid hasn't been implemented yet");
-
-  return FALSE;
-}
-
-gboolean ctxusb_daemon_get_policy_domuuid(
-  CtxusbDaemonObject *this,
-  const char *uuid,
-  char **value, GError **error)
-{
-  g_set_error(error,
-              DBUS_GERROR,
-              DBUS_GERROR_FAILED,
-              "get_policy_domuuid hasn't been implemented yet");
-
-  return FALSE;
-}
-
 gboolean ctxusb_daemon_new_vm(CtxusbDaemonObject *this,
                               gint IN_dom_id, GError **error)
 {

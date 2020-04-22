@@ -181,6 +181,16 @@ void  rpc_init(void);
 int   udev_init(void);
 void  udev_event(void);
 void  udev_fill_devices(void);
+int   udev_device_tree_match_sysattr(struct udev_device *dev,
+    const char *key,
+    const char *value);
+int   udev_device_tree_match_property(struct udev_device *dev,
+    const char *key,
+    const char *value);
+int   udev_device_tree_match(struct udev_device *dev,
+    const char *key,
+    const char *value,
+    int sysattr /* 1 for sysattr, 0 for property*/);
 
 device_t* device_lookup(int busid, int devid);
 device_t* device_lookup_by_attributes(int vendorid, int deviceid, char *serial);

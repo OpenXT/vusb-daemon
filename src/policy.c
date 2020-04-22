@@ -107,15 +107,16 @@ vm_focused(void)
 static bool
 device_matches_udev_rule(rule_t *rule, device_t *device)
 {
-  const char *value;
   char **pairs;
 
   if (rule->dev_sysattrs != NULL) {
     pairs = rule->dev_sysattrs;
     while (*pairs != NULL) {
-      value = udev_device_get_sysattr_value(device->udev, *pairs);
-      if (value == NULL || strcmp(*(pairs + 1), value))
+      if (! udev_device_tree_match_sysattr(device->udev,
+            pairs[0],
+            pairs[1]))
         return false;
+
       pairs += 2;
     }
   }
@@ -123,9 +124,11 @@ device_matches_udev_rule(rule_t *rule, device_t *device)
   if (rule->dev_properties != NULL) {
     pairs = rule->dev_properties;
     while (*pairs != NULL) {
-      value = udev_device_get_property_value(device->udev, *pairs);
-      if (value == NULL || strcmp(*(pairs + 1), value))
+      if (! udev_device_tree_match_property(device->udev,
+            pairs[0],
+            pairs[1]))
         return false;
+
       pairs += 2;
     }
   }

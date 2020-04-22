@@ -221,6 +221,10 @@ int   xenstore_init(void);
 void  xenstore_deinit(void);
 
 int   policy_init(void);
+void  policy_add_rule(rule_t *rule);
+void  policy_free_rule(rule_t *rule);
+void  policy_list_rules(uint16_t **list, size_t *size);
+rule_t* policy_get_rule(uint16_t position);
 bool  policy_is_allowed(device_t *device, vm_t *vm);
 int   policy_set_sticky(int dev);
 int   policy_unset_sticky(int dev);
@@ -228,6 +232,7 @@ char* policy_get_sticky_uuid(int dev);
 int   policy_auto_assign_new_device(device_t *device);
 int   policy_auto_assign_devices_to_new_vm(vm_t *vm);
 void  policy_reload_from_db(void);
+int   policy_remove_rule(uint16_t position);
 
 void  usbmanager_device_added(device_t *device);
 void  usbmanager_device_removed(void);

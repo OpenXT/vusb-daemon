@@ -253,7 +253,6 @@ udev_find_more(struct udev_device *dev, device_t *device, int new)
   udev_enumerate_unref(enumerate);
 }
 
-/* Check the device and nodes down the tree */
 int
 udev_device_tree_match(struct udev_device *dev,
     const char *key,

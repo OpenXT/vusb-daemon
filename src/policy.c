@@ -49,6 +49,80 @@ vm_gets_devices_when_in_focus(vm_t *vm)
   return (v == TRUE) ? true : false;
 }
 
+rule_t*
+policy_get_rule(uint16_t position)
+{
+  struct list_head *pos;
+  rule_t *rule = NULL;
+
+  list_for_each(pos, &rules.list) {
+    rule = list_entry(pos, rule_t, list);
+
+    if (rule->pos == position) break;
+
+    if (rule->pos > position) {
+      rule = NULL;
+      break;
+    }
+  }
+
+  return rule;
+}
+
+int
+policy_remove_rule(uint16_t position)
+{
+  struct list_head *pos, *tmp;
+  rule_t *rule = NULL;
+
+  list_for_each_safe(pos, tmp, &rules.list) {
+    rule = list_entry(pos, rule_t, list);
+    if (rule->pos == position) {
+      list_del(&rule->list);
+      xd_log(LOG_INFO, "Removed USB policy rule %d", position);
+      policy_free_rule(rule);
+      db_write_policy(&rules);
+      return 1;
+    }
+
+    if (rule->pos > position) break;
+  }
+
+  xd_log(LOG_INFO,
+      "Attempted to remove USB policy rule %d, but rule was not found",
+      position);
+
+  return 0;
+}
+
+void
+policy_list_rules(uint16_t **list, size_t *size)
+{
+  struct list_head *pos;
+  rule_t *rule;
+  uint16_t index = 0;
+  int rule_count = 0;
+  uint16_t *rule_indices = NULL;
+
+  list_for_each(pos, &rules.list) {
+    rule_count++;
+  }
+  *size = rule_count;
+  if (rule_count == 0) return;
+
+  rule_indices = (uint16_t *)malloc(sizeof(uint16_t) * rule_count);
+  list_for_each(pos, &rules.list)
+  {
+    rule = list_entry(pos, rule_t, list);
+    if (rule != NULL)
+    {
+      rule_indices[index] = rule->pos;
+    }
+    index++;
+  }
+  *list = rule_indices;
+}
+
 static void
 dump_rules(void)
 {
@@ -148,8 +222,7 @@ device_matches_rule(rule_t *rule, device_t *device)
       device->deviceid != rule->dev_deviceid)
     return false;
   /* If the rule specifies a serial, it has to match */
-  if (rule->dev_serial != NULL)
-  {
+  if (rule->dev_serial != NULL) {
     /* If the device does not have a serial, it does not match */
     if (device->serial == NULL)
       return false;
@@ -211,6 +284,60 @@ default_lookup(device_t *device)
   return rule_lookup(device, DEFAULT);
 }
 
+void
+policy_add_rule(rule_t *new_rule)
+{
+  struct list_head *pos;
+  rule_t *rule_tmp = NULL;
+
+  if (new_rule == NULL) return;
+
+  list_for_each(pos, &rules.list) {
+    rule_tmp = list_entry(pos, rule_t, list);
+    if (rule_tmp->pos >= new_rule->pos)
+      break;
+  }
+  if (rule_tmp == NULL) {
+    list_add(&new_rule->list, &rules.list);
+    xd_log(LOG_INFO,
+        "Rule %d added, as the only rule in the set",
+        new_rule->pos);
+  }
+  else if (new_rule->pos > rule_tmp->pos) {
+    list_add(&new_rule->list, &rule_tmp->list);
+    xd_log(LOG_INFO,
+        "New rule %d added",
+        new_rule->pos);
+  }
+  else if (rule_tmp->pos == new_rule->pos) {
+    //list_replace(&rule_tmp->list, &new_rule->list);
+    struct list_head *old, *new;
+
+    old = &rule_tmp->list;
+    new = &new_rule->list;
+
+    new->next = old->next;
+    new->next->prev = new;
+    new->prev = old->prev;
+    new->prev->next = new;
+
+    xd_log(LOG_INFO,
+        "Rule %d added, replacing an existing rule",
+        new_rule->pos);
+
+   /* Free replaced rule */
+    policy_free_rule(rule_tmp);
+  }
+  else {
+    list_add_tail(&new_rule->list, &rule_tmp->list);
+    xd_log(LOG_INFO,
+        "New rule %d added at end of list",
+        new_rule->pos);
+  }
+
+  db_write_policy(&rules);
+}
+
 /**
  * Create a new sticky rule using a device and its currently assigned
  * VM, then rewrite the rules to the database
@@ -236,8 +363,7 @@ policy_set_sticky(int dev)
   if (device == NULL || device->vm == NULL)
     return -1;
   /* Do not set sticky for ambiguous devices */
-  if (device_is_ambiguous(device))
-  {
+  if (device_is_ambiguous(device)) {
     xd_log(LOG_INFO,
         "Not setting sticky for device: Bus=%d Dev=%d",
         busid,
@@ -264,7 +390,6 @@ policy_set_sticky(int dev)
   }
   list_add(&new_rule->list, &rules.list);
 
-  dump_rules();
   db_write_policy(&rules);
 
   return 0;
@@ -293,7 +418,7 @@ policy_unset_sticky(int dev)
   if (rule == NULL)
     return -1;
   list_del(&rule->list);
-  dump_rules();
+  policy_free_rule(rule);
   db_write_policy(&rules);
 
   return 0;
@@ -366,8 +491,7 @@ policy_auto_assign_new_device(device_t *device)
   if (device == NULL) return 1;
 
   /* Don't auto assign ambiguous devices */
-  if (device_is_ambiguous(device))
-  {
+  if (device_is_ambiguous(device)) {
     xd_log(LOG_INFO,
         "Rejecting automatic assignment of ambiguous device: Bus=%d Dev=%d",
         device->busid,
@@ -393,8 +517,7 @@ policy_auto_assign_new_device(device_t *device)
   if (vm != NULL &&
       vm->domid > 0 &&
       vm->domid != uivm &&
-      policy_is_allowed(device, vm))
-  {
+      policy_is_allowed(device, vm)) {
     device->vm = vm;
     res = usbowls_plug_device(vm->domid, device->busid, device->devid);
     if (res != 0)
@@ -434,8 +557,7 @@ policy_auto_assign_devices_to_new_vm(vm_t *vm)
           continue;
         /* The device matches the rule, let's try to assign it */
         if (device->vm != NULL) {
-          if (device->vm != vm)
-          {
+          if (device->vm != vm) {
             xd_log(LOG_ERR, "An always-assign device is assigned to another VM, this shouldn't happen!");
             ret = -1;
             continue;
@@ -445,8 +567,7 @@ policy_auto_assign_devices_to_new_vm(vm_t *vm)
           }
         } else {
           /* Don't auto assign ambiguous devices */
-          if (device_is_ambiguous(device))
-          {
+          if (device_is_ambiguous(device)) {
             xd_log(LOG_INFO,
                 "Skipping automatic assignment of ambiguous device: Bus=%d Dev=%d, rule %d will be removed",
                 device->busid,
@@ -465,14 +586,50 @@ policy_auto_assign_devices_to_new_vm(vm_t *vm)
     }
     /* Cleanse rule because UI thinks unassigned devices are attached due to
      * sticky association */
-    if (clean == 1){
+    if (clean == 1) {
       list_del(&rule->list);
+      policy_free_rule(rule);
       db_write_policy(&rules);
       clean = 0;
     }
   }
 
   return ret;
+}
+
+enum command
+policy_parse_command_string(const char* cmd)
+{
+  if (cmd == NULL || cmd[0] == '\0') return DENY;
+
+  if (strcmp(cmd, "allow") == 0) return ALLOW;
+  if (strcmp(cmd, "always") == 0) return ALWAYS;
+  if (strcmp(cmd, "default") == 0) return DEFAULT;
+  if (strcmp(cmd, "deny") == 0) return DENY;
+
+  return UNKNOWN;
+}
+
+char*
+policy_parse_command_enum(enum command cmd)
+{
+  char* command = calloc(sizeof(char),8);
+  switch (cmd)
+  {
+    case ALLOW:
+      strcpy(command, "allow");
+      break;
+    case ALWAYS:
+      strcpy(command, "always");
+      break;
+    case DEFAULT:
+      strcpy(command, "default");
+      break;
+    default:
+      strcpy(command, "deny");
+      break;
+  }
+  return command;
 }
 
 static void
@@ -492,6 +649,18 @@ policy_flush_pairs(char ***list)
   free(*list);
 }
 
+void
+policy_free_rule(rule_t *rule)
+{
+  if (rule == NULL) return;
+  free(rule->desc);
+  free(rule->dev_serial);
+  policy_flush_pairs(&rule->dev_sysattrs);
+  policy_flush_pairs(&rule->dev_properties);
+  free(rule->vm_uuid);
+  free(rule);
+}
+
 static void
 policy_flush_rules(void)
 {
@@ -501,12 +670,7 @@ policy_flush_rules(void)
   list_for_each_safe(pos, tmp, &rules.list) {
     rule = list_entry(pos, rule_t, list);
     list_del(pos);
-    free(rule->desc);
-    free(rule->dev_serial);
-    policy_flush_pairs(&rule->dev_sysattrs);
-    policy_flush_pairs(&rule->dev_properties);
-    free(rule->vm_uuid);
-    free(rule);
+    policy_free_rule(rule);
   }
 }
 

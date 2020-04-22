@@ -37,7 +37,8 @@ enum command {
   ALWAYS,                 /**< Always plug device to VM. implies ALLOW */
   DEFAULT,                /**< Plug device to VM by default, implies ALLOW */
   ALLOW,                  /**< Allow device to be plugged to VM */
-  DENY                    /**< Deny device to be plugged to VM */
+  DENY,                   /**< Deny device to be plugged to VM */
+  UNKNOWN                 /**< Unknown command, usually due to input parsing */
 };
 
 #define KEYBOARD        0x1     /**< Keyboard device type */
@@ -65,5 +66,9 @@ typedef struct {
   char **dev_properties; /**< List of key value pairs for the udev properties */
   char *vm_uuid;         /**< VM UUID */
 } rule_t;
+
+
+char* policy_parse_command_enum(enum command cmd);
+enum command policy_parse_command_string(const char* cmd);
 
 #endif 	    /* !POLICY_H_ */

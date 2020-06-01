@@ -28,6 +28,7 @@
  */
 
 #include "project.h"
+#include "policy.h"
 
 #define DEV_STATE_ERROR       -1 /**< Cannot find device */
 #define DEV_STATE_UNUSED      0  /**< Device not in use by any VM */
@@ -46,11 +47,38 @@
 #define SERVICE "com.citrix.xenclient.usbdaemon"
 #define SERVICE_OBJ_PATH "/"
 
+#define DBUS_RULE_STRUCT (dbus_g_type_get_struct ("GValueArray",\
+      G_TYPE_INT,\
+      G_TYPE_STRING,\
+      G_TYPE_STRING,\
+      G_TYPE_STRING,\
+      G_TYPE_STRING,\
+      G_TYPE_STRING,\
+      DBUS_TYPE_G_STRING_STRING_HASHTABLE,\
+      DBUS_TYPE_G_STRING_STRING_HASHTABLE,\
+      G_TYPE_STRING,\
+      G_TYPE_INVALID))
+
 static DBusConnection  *g_dbus_conn = NULL;
 static DBusGConnection *g_glib_dbus_conn = NULL;
 
 /* CTXUSB_DAEMON dbus object implementation */
 #include "rpcgen/ctxusb_daemon_server_obj.h"
+
+static void free_hash_table(GHashTable* table)
+{
+  gpointer key, value;
+  if (table == NULL) return;
+
+  GHashTableIter iterator;
+  g_hash_table_iter_init(&iterator, table);
+  while (g_hash_table_iter_next (&iterator, &key, &value))
+  {
+    g_free(key);
+    g_free(value);
+  }
+  g_hash_table_destroy(table);
+}
 
 /**
  * @brief Initialize the DBus RPC bits
@@ -113,32 +141,6 @@ add_vm(int domid)
   return res;
 }
 
-gboolean ctxusb_daemon_set_policy_domuuid(
-  CtxusbDaemonObject *this,
-  const char *uuid,
-  const char *policy, GError **error)
-{
-  g_set_error(error,
-              DBUS_GERROR,
-              DBUS_GERROR_FAILED,
-              "set_policy_domuuid hasn't been implemented yet");
-
-  return FALSE;
-}
-
-gboolean ctxusb_daemon_get_policy_domuuid(
-  CtxusbDaemonObject *this,
-  const char *uuid,
-  char **value, GError **error)
-{
-  g_set_error(error,
-              DBUS_GERROR,
-              DBUS_GERROR_FAILED,
-              "get_policy_domuuid hasn't been implemented yet");
-
-  return FALSE;
-}
-
 gboolean ctxusb_daemon_new_vm(CtxusbDaemonObject *this,
                               gint IN_dom_id, GError **error)
 {
@@ -159,6 +161,365 @@ gboolean ctxusb_daemon_new_vm(CtxusbDaemonObject *this,
     policy_auto_assign_devices_to_new_vm(vm);
     return TRUE;
   }
+}
+
+gboolean ctxusb_daemon_policy_get_rule(CtxusbDaemonObject *this,
+    gint IN_rule_id,
+    char* *OUT_command,
+    char* *OUT_description,
+    char* *OUT_vendor_id,
+    char* *OUT_device_id,
+    char* *OUT_serial_number,
+    GHashTable* *OUT_sysattrs,
+    GHashTable* *OUT_udev_properties,
+    char* *OUT_vm_uuid,
+    GError** error)
+{
+  rule_t *rule = NULL;
+  char **dict;
+
+  GHashTable* rule_sysattrs = g_hash_table_new(g_str_hash, g_str_equal);
+  GHashTable* rule_properties = g_hash_table_new(g_str_hash, g_str_equal);
+
+  rule = policy_get_rule(IN_rule_id);
+
+  if (rule == NULL) {
+    g_set_error(error,
+        DBUS_GERROR,
+        DBUS_GERROR_FAILED,
+        "Rule %d not found", IN_rule_id);
+    return FALSE;
+  }
+
+  dict = rule->dev_sysattrs;
+  if (dict != NULL)
+  {
+    while (*dict != NULL && *(dict + 1) != NULL)
+    {
+      g_hash_table_insert(rule_sysattrs,
+          g_strdup(*dict),
+          g_strdup(*(dict + 1)));
+      dict += 2;
+    }
+  }
+
+  dict = rule->dev_properties;
+  if (dict != NULL)
+  {
+    while (*dict != NULL && *(dict + 1) != NULL)
+    {
+      g_hash_table_insert(rule_properties,
+          g_strdup(*dict),
+          g_strdup(*(dict + 1)));
+      dict += 2;
+    }
+  }
+
+  if (rule->dev_vendorid == 0x0)
+    *OUT_vendor_id = g_strdup("");
+  else
+    *OUT_vendor_id = g_strdup_printf("%04X", rule->dev_vendorid);
+
+  if (rule->dev_deviceid == 0x0)
+    *OUT_device_id = g_strdup("");
+  else
+    *OUT_device_id = g_strdup_printf("%04X", rule->dev_deviceid);
+
+  *OUT_command = policy_parse_command_enum(rule->cmd);
+  *OUT_description = g_strdup(rule->desc);
+  *OUT_serial_number = g_strdup(rule->dev_serial);
+  *OUT_sysattrs = rule_sysattrs;
+  *OUT_udev_properties = rule_properties;
+  *OUT_vm_uuid = g_strdup(rule->vm_uuid);
+  return TRUE;
+}
+
+gboolean ctxusb_daemon_policy_list(CtxusbDaemonObject *this,
+    GArray* *OUT_rules,
+    GError** error)
+{
+  uint16_t *rule_list = NULL;
+  size_t size = 0;
+
+  GArray *index_array = g_array_new(FALSE, TRUE, sizeof(gint));
+  *OUT_rules = index_array;
+
+  policy_list_rules(&rule_list, &size);
+
+  for (size_t index=0; index < size; index++)
+  {
+    gint value = (gint)(rule_list[index]);
+    g_array_append_val(index_array, value);
+  }
+  if (size != 0 && rule_list != NULL) free(rule_list);
+
+  return TRUE;
+}
+
+gboolean ctxusb_daemon_policy_get_rules(CtxusbDaemonObject *this,
+    GPtrArray* *OUT_rule_set,
+    GError** error)
+{
+  uint16_t *rule_list = NULL;
+  size_t size = 0;
+
+  GPtrArray* response = g_ptr_array_new();
+  *OUT_rule_set = response;
+
+  policy_list_rules(&rule_list, &size);
+
+  for (size_t index=0; index < size; index++)
+  {
+    gint pos = (gint)rule_list[index];
+    char *command = NULL;
+    char *description = NULL;
+    char *vendor_id = NULL;
+    char *device_id = NULL;
+    char *serial_number = NULL;
+    GHashTable *sysattrs;
+    GHashTable *udev_properties;
+    char* vm_uuid = NULL;
+
+    if (! ctxusb_daemon_policy_get_rule(
+        this,
+        pos,
+        &command,
+        &description,
+        &vendor_id,
+        &device_id,
+        &serial_number,
+        &sysattrs,
+        &udev_properties,
+        &vm_uuid,
+        error)) continue;
+
+    GValue *value = g_new0(GValue, 1);
+    g_value_init(value, DBUS_RULE_STRUCT);
+    g_value_take_boxed(value,
+        dbus_g_type_specialized_construct(DBUS_RULE_STRUCT));
+    dbus_g_type_struct_set(value,
+        0, pos,
+        1, command,
+        2, description,
+        3, vendor_id,
+        4, device_id,
+        5, serial_number,
+        6, sysattrs,
+        7, udev_properties,
+        8, vm_uuid,
+        G_MAXUINT);
+    g_ptr_array_add(response, g_value_get_boxed(value));
+
+    g_free(command);
+    g_free(description);
+    g_free(vendor_id);
+    g_free(device_id);
+    g_free(serial_number);
+    free_hash_table(sysattrs);
+    free_hash_table(udev_properties);
+    g_free(vm_uuid);
+
+    g_free(value);
+  }
+
+  free(rule_list);
+  return TRUE;
+}
+
+gboolean ctxusb_daemon_policy_remove_rule(CtxusbDaemonObject *this,
+    gint IN_rule_id,
+    GError **error)
+{
+  if (! policy_remove_rule(IN_rule_id))
+  {
+    g_set_error(error,
+                DBUS_GERROR,
+                DBUS_GERROR_FAILED,
+                "Failed to remove rule %d", IN_rule_id);
+    return FALSE;
+  }
+  return TRUE;
+}
+
+gboolean ctxusb_daemon_policy_set_rule(CtxusbDaemonObject *this,
+    gint IN_rule_id,
+    const char *IN_command,
+    const char *IN_description,
+    const char *IN_vendor_id,
+    const char *IN_device_id,
+    const char *IN_serial_number,
+    GHashTable *IN_sysattrs,
+    GHashTable *IN_udev_properties,
+    const char *IN_vm_uuid,
+    GError* *error)
+{
+  rule_t *new_rule;
+  guint sysattr_size = g_hash_table_size(IN_sysattrs);
+  guint properties_size = g_hash_table_size(IN_udev_properties);
+  GHashTableIter iterator;
+  gpointer key, value;
+  enum command cmd = policy_parse_command_string(IN_command);
+
+  if (IN_rule_id < 0 || IN_rule_id > UINT16_MAX)
+  {
+    g_set_error(error,
+        DBUS_GERROR,
+        DBUS_GERROR_FAILED,
+        "Invalid rule ID: %d", IN_rule_id);
+    return FALSE;
+  }
+
+  if (cmd == UNKNOWN)
+  {
+    g_set_error(error,
+        DBUS_GERROR,
+        DBUS_GERROR_FAILED,
+        "Invalid command: %s", IN_command);
+    return FALSE;
+  }
+
+  /* Gets freed upon policy remove */
+  new_rule = malloc(sizeof(rule_t));
+  memset(new_rule, 0, sizeof(rule_t));
+
+  new_rule->pos = IN_rule_id;
+  new_rule->cmd = cmd;
+
+  if (IN_vendor_id != NULL && IN_vendor_id[0] != '\0')
+  {
+    char *end = NULL;
+    long value = strtol(IN_vendor_id, &end, 16);;
+    if (end != NULL &&
+        end == IN_vendor_id + strlen(IN_vendor_id) &&
+        value >= 0 &&
+        value <= UINT16_MAX)
+    {
+      new_rule->dev_vendorid = (uint16_t)value;
+    }
+    else
+    {
+      free(new_rule);
+      g_set_error(error,
+          DBUS_GERROR,
+          DBUS_GERROR_FAILED,
+          "Invalid vendor ID: %s", IN_vendor_id);
+      return FALSE;
+    }
+  }
+
+  if (IN_device_id != NULL && IN_device_id[0] != '\0')
+  {
+    char *end = NULL;
+    long value = strtol(IN_device_id, &end, 16);
+    if (end != NULL &&
+        end == IN_device_id + strlen(IN_device_id) &&
+        value >= 0 &&
+        value <= UINT16_MAX)
+    {
+      new_rule->dev_deviceid = (uint16_t)value;
+    }
+    else
+    {
+      free(new_rule);
+      g_set_error(error,
+          DBUS_GERROR,
+          DBUS_GERROR_FAILED,
+          "Invalid vendor ID: %s", IN_device_id);
+      return FALSE;
+    }
+  }
+
+  if (IN_serial_number != NULL && IN_serial_number[0] != '\0')
+  {
+    new_rule->dev_serial = malloc(strlen(IN_serial_number) + 1);
+    strcpy(new_rule->dev_serial, IN_serial_number);
+  }
+
+  if (IN_description != NULL && IN_description[0] != '\0')
+  {
+    new_rule->desc = malloc(strlen(IN_description) + 1);
+    strcpy(new_rule->desc, IN_description);
+  }
+
+  if (IN_vm_uuid != NULL && IN_vm_uuid[0] != '\0')
+  {
+    new_rule->vm_uuid = malloc(strlen(IN_vm_uuid) + 1);
+    strcpy(new_rule->vm_uuid, IN_vm_uuid);
+  }
+
+  if (sysattr_size > 0)
+  {
+    int index=0;
+    new_rule->dev_sysattrs = calloc((2 * sysattr_size) + 1, sizeof(char*));
+    g_hash_table_iter_init(&iterator, IN_sysattrs);
+    while (g_hash_table_iter_next (&iterator, &key, &value))
+    {
+      new_rule->dev_sysattrs[index] = g_strdup(key);
+      new_rule->dev_sysattrs[index + 1] = g_strdup(value);
+      index += 2;
+    }
+  }
+
+  if (properties_size > 0)
+  {
+    int index=0;
+    new_rule->dev_properties = calloc((2 * properties_size) + 1, sizeof(char*));
+    g_hash_table_iter_init(&iterator, IN_udev_properties);
+    while (g_hash_table_iter_next (&iterator, &key, &value))
+    {
+      new_rule->dev_properties[index] = g_strdup(key);
+      new_rule->dev_properties[index + 1] = g_strdup(value);
+      index += 2;
+    }
+  }
+
+  policy_add_rule(new_rule);
+  return TRUE;
+}
+
+gboolean ctxusb_daemon_policy_set_rule_basic(CtxusbDaemonObject *this,
+    gint IN_rule_id,
+    const char *IN_command,
+    const char *IN_description,
+    const char *IN_vendor_id,
+    const char *IN_device_id,
+    const char *IN_serial_number,
+    const char *IN_vm_uuid,
+    GError **error)
+{
+  return ctxusb_daemon_policy_set_rule(this,
+      IN_rule_id,
+      IN_command,
+      IN_description,
+      IN_vendor_id,
+      IN_device_id,
+      IN_serial_number,
+      g_hash_table_new(g_str_hash, g_str_equal),
+      g_hash_table_new(g_str_hash, g_str_equal),
+      IN_vm_uuid,
+      error);
+}
+
+gboolean ctxusb_daemon_policy_set_rule_advanced(CtxusbDaemonObject *this,
+    gint IN_rule_id,
+    const char *IN_command,
+    const char *IN_description,
+    GHashTable *IN_sysattrs,
+    GHashTable *IN_udev_properties,
+    const char *IN_vm_uuid,
+    GError **error)
+{
+  return ctxusb_daemon_policy_set_rule(this,
+      IN_rule_id,
+      IN_command,
+      IN_description,
+      "",
+      "",
+      "",
+      IN_sysattrs,
+      IN_udev_properties,
+      IN_vm_uuid,
+      error);
 }
 
 gboolean ctxusb_daemon_vm_stopped(CtxusbDaemonObject *this,

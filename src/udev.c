@@ -253,6 +253,62 @@ udev_find_more(struct udev_device *dev, device_t *device, int new)
   udev_enumerate_unref(enumerate);
 }
 
+int
+udev_device_tree_match(struct udev_device *dev,
+    const char *key,
+    const char *value,
+    int sysattr)
+{
+  struct udev_enumerate *enumerate;
+  struct udev_list_entry *udev_device_list, *udev_device_entry;
+  struct udev_device *udev_device;
+  const char *path;
+  const char *temp_value;
+  int found = 0;
+
+  enumerate = udev_enumerate_new(udev_handle);
+  udev_enumerate_add_match_parent(enumerate, dev);
+  udev_enumerate_scan_devices(enumerate);
+  udev_device_list = udev_enumerate_get_list_entry(enumerate);
+  udev_list_entry_foreach(udev_device_entry, udev_device_list) {
+    path = udev_list_entry_get_name(udev_device_entry);
+    udev_device = udev_device_new_from_syspath(udev_handle, path);
+    if (sysattr)
+      temp_value = udev_device_get_sysattr_value(udev_device, key);
+    else
+      temp_value = udev_device_get_property_value(udev_device, key);
+
+    if (temp_value != NULL && !strcmp(temp_value, value))
+    {
+      udev_device_unref(udev_device);
+      found = 1;
+      break;
+    }
+    udev_device_unref(udev_device);
+  }
+
+  /* Cleanup */
+  udev_enumerate_unref(enumerate);
+  return found;
+}
+
+
+int
+udev_device_tree_match_sysattr(struct udev_device *dev,
+    const char *key,
+    const char *value)
+{
+  return udev_device_tree_match(dev, key, value, 1);
+}
+
+int
+udev_device_tree_match_property(struct udev_device *dev,
+    const char *key,
+    const char *value)
+{
+  return udev_device_tree_match(dev, key, value, 0);
+}
+
 /* Ignore device configurations and interfaces */
 static int
 check_sysname(const char *s)

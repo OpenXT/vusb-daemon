@@ -235,15 +235,7 @@ parse_rule(char *rule_node)
       if        (!strcmp(*rule, NODE_COMMAND)) {
         value = parse_value(rule_path, *rule);
         if (value != NULL) {
-          if (!strcmp(value, "always"))
-            res->cmd = ALWAYS;
-          else if (!strcmp(value, "default"))
-            res->cmd = DEFAULT;
-          else if (!strcmp(value, "allow"))
-            res->cmd = ALLOW;
-          else if (!strcmp(value, "deny"))
-            res->cmd = DENY;
-          else db_log(DB_LOG_ERR, "Unknown command %s", value);
+          res->cmd = policy_parse_command_string(value);
           g_free(value);
         }
       } else if (!strcmp(*rule, NODE_DESCRIPTION)) {
@@ -342,6 +334,24 @@ db_read_policy(rule_t *rules)
 }
 
 /**
+ * Write sysattr or property nodes
+ */
+static void
+write_sysattr_or_properties(int pos, char *node_path, char** map) {
+  int index=0;
+  char subnode_path[128];
+
+  if (node_path == NULL || map == NULL) return;
+  while (map[index] != NULL) {
+    snprintf(subnode_path, 128, "%s/%s",
+        node_path,
+        map[index]);
+    db_write_rule_key(pos, subnode_path, map[index+1]);
+    index += 2;
+  }
+}
+
+/**
  * Dump the policy to the database
  *
  * @param rules The list of rules to write
@@ -359,14 +369,9 @@ db_write_policy(rule_t *rules)
     rule = list_entry(pos, rule_t, list);
     if (rule->desc != NULL)
       db_write_rule_key(rule->pos, NODE_DESCRIPTION, rule->desc);
-    if (rule->cmd == ALWAYS)
-      db_write_rule_key(rule->pos, NODE_COMMAND, "always");
-    else if (rule->cmd == ALLOW)
-      db_write_rule_key(rule->pos, NODE_COMMAND, "allow");
-    else if (rule->cmd == DEFAULT)
-      db_write_rule_key(rule->pos, NODE_COMMAND, "default");
-    else if (rule->cmd == DENY)
-      db_write_rule_key(rule->pos, NODE_COMMAND, "deny");
+
+    db_write_rule_key(rule->pos, NODE_COMMAND, policy_parse_command_enum(rule->cmd));
+
     if (rule->dev_type != 0) {
       if (rule->dev_type & KEYBOARD)
         db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_KEYBOARD, "1");
@@ -399,6 +404,16 @@ db_write_policy(rule_t *rules)
     }
     if (rule->dev_serial != NULL) {
       db_write_rule_key(rule->pos, NODE_DEVICE "/" NODE_SERIAL, rule->dev_serial);
+    }
+    if (rule->dev_sysattrs != NULL) {
+      write_sysattr_or_properties(rule->pos,
+          NODE_DEVICE "/" NODE_SYSATTR,
+          rule->dev_sysattrs);
+    }
+    if (rule->dev_properties != NULL) {
+      write_sysattr_or_properties(rule->pos,
+          NODE_DEVICE "/" NODE_PROPERTY,
+          rule->dev_properties);
     }
     if (rule->vm_uuid != NULL)
       db_write_rule_key(rule->pos, NODE_VM "/" NODE_UUID, rule->vm_uuid);

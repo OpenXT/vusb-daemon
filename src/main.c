@@ -72,6 +72,9 @@ main() {
   int nfds;
   int udevfd;
 
+  /* init libusb */
+  usb_init();
+
   /* Init global VMs and devices lists */
   INIT_LIST_HEAD(&vms.list);
   INIT_LIST_HEAD(&devices.list);

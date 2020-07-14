@@ -698,7 +698,7 @@ gboolean ctxusb_daemon_assign_device(CtxusbDaemonObject *this,
                 "Device %d is set to be always assigned to another VM", IN_dev_id);
     return FALSE;
   }
-  if (!policy_is_allowed(device, vm)) {
+  if (!policy_is_allowed(device, vm, NULL)) {
     notify_com_citrix_xenclient_usbdaemon_device_rejected(g_xcbus,
 							  USBDAEMON,
 							  USBDAEMON_OBJ,

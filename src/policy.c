@@ -462,7 +462,7 @@ policy_get_sticky_uuid(int dev)
  * Check if the policy allows a given device to be assigned to a given VM
  */
 bool
-policy_is_allowed(device_t *device, vm_t *vm)
+policy_is_allowed(device_t *device, vm_t *vm, rule_t **rule_ptr)
 {
   struct list_head *pos;
   rule_t *rule;
@@ -483,6 +483,8 @@ policy_is_allowed(device_t *device, vm_t *vm)
             device->serial,
             vm->uuid,
             rule->pos);
+        if (rule_ptr != NULL)
+          *rule_ptr = rule;
         return true;
       }
       else {
@@ -495,6 +497,8 @@ policy_is_allowed(device_t *device, vm_t *vm)
             device->serial,
             vm->uuid,
             rule->pos);
+        if (rule_ptr != NULL)
+          *rule_ptr = rule;
         return false;
       }
     }
@@ -558,7 +562,7 @@ policy_auto_assign_new_device(device_t *device)
   if (vm != NULL &&
       vm->domid > 0 &&
       vm->domid != uivm &&
-      policy_is_allowed(device, vm)) {
+      policy_is_allowed(device, vm, &rule)) {
     device->vm = vm;
     res = usbowls_plug_device(vm->domid, device->busid, device->devid);
     if (res != 0)

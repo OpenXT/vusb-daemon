@@ -225,7 +225,7 @@ void  policy_add_rule(rule_t *rule);
 void  policy_free_rule(rule_t *rule);
 void  policy_list_rules(uint16_t **list, size_t *size);
 rule_t* policy_get_rule(uint16_t position);
-bool  policy_is_allowed(device_t *device, vm_t *vm);
+bool  policy_is_allowed(device_t *device, vm_t *vm, rule_t **rule_ptr);
 int   policy_set_sticky(int dev);
 int   policy_unset_sticky(int dev);
 char* policy_get_sticky_uuid(int dev);

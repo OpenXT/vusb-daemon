@@ -128,7 +128,7 @@ vm_add(const int domid, const char *uuid)
     }
   }
 
-  xd_log(LOG_INFO, "Adding vm, domid=%d, uuid=%s", domid, new_uuid);
+  xd_log(LOG_DEBUG, "Adding vm, domid=%d, uuid=%s", domid, new_uuid);
   vm = malloc(sizeof(vm_t));
   vm->domid = domid;
   vm->uuid = new_uuid;

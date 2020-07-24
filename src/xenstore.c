@@ -240,7 +240,7 @@ xenstore_list_domain_devs(dominfo_t *domp)
       char *bepath = xenstore_dev_bepath(domp, "vusb", virtid);
       char *online = xenstore_get_keyval(bepath, "online");
       if (online && !strcmp(online, "1"))
-        xd_log(LOG_INFO, "%d %d", bus, dev);
+        xd_log(LOG_DEBUG, "Device %03d:%03d is online", bus, dev);
       free(online);
       free(bepath);
     }
@@ -467,7 +467,7 @@ xenstore_destroy_usb(dominfo_t *domp, usbinfo_t *usbp)
   char *fepath;
   int ret;
 
-  xd_log(LOG_INFO, "Deleting VUSB node %d for %d.%d",
+  xd_log(LOG_DEBUG, "Deleting VUSB node %d for %d.%d",
          usbp->usb_virtid, usbp->usb_bus, usbp->usb_device);
 
   bepath = xenstore_dev_bepath(domp, "vusb", usbp->usb_virtid);
@@ -485,9 +485,8 @@ xenstore_destroy_usb(dominfo_t *domp, usbinfo_t *usbp)
     xs_rm(xs_handle, XBT_NULL, fepath);
     ret = 0;
   } else {
-    xd_log(LOG_ERR, "Failed to bring the USB device offline");
+    xd_log(LOG_ERR, "Failed to bring the USB device offline, cleaning xenstore nodes anyway");
     /* FIXME: Should we keep the nodes around? Check if the VM is asleep? */
-    xd_log(LOG_ERR, "Cleaning xenstore nodes anyway");
     xs_rm(xs_handle, XBT_NULL, bepath);
     xs_rm(xs_handle, XBT_NULL, fepath);
     ret = -1;

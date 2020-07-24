@@ -698,7 +698,7 @@ gboolean ctxusb_daemon_assign_device(CtxusbDaemonObject *this,
                 "Device %d is set to be always assigned to another VM", IN_dev_id);
     return FALSE;
   }
-  if (!policy_is_allowed(device, vm)) {
+  if (!policy_is_allowed(device, vm, NULL)) {
     notify_com_citrix_xenclient_usbdaemon_device_rejected(g_xcbus,
 							  USBDAEMON,
 							  USBDAEMON_OBJ,
@@ -707,7 +707,7 @@ gboolean ctxusb_daemon_assign_device(CtxusbDaemonObject *this,
     g_set_error(error,
                 DBUS_GERROR,
                 DBUS_GERROR_FAILED,
-                "The policy denied assignation of device %d to VM %s", IN_dev_id, IN_vm_uuid);
+                "The policy denied assignment of device %d to VM %s", IN_dev_id, IN_vm_uuid);
     return FALSE;
   }
 
@@ -722,6 +722,14 @@ gboolean ctxusb_daemon_assign_device(CtxusbDaemonObject *this,
     return FALSE;
   }
 
+  xd_log(LOG_INFO,
+      "Device [Bus=%03d, Dev=%03d, VID=%04X, PID=%04X] plugged into VM [UUID=%s, DomID=%d]",
+      device->busid,
+      device->devid,
+      device->vendorid,
+      device->deviceid,
+      vm->uuid,
+      vm->domid);
   return TRUE;
 }
 
@@ -764,6 +772,15 @@ gboolean ctxusb_daemon_unassign_device(CtxusbDaemonObject *this,
                 "Failed to gracefully unplug device %d-%d from VM %d", device->busid, device->devid, device->vm->domid);
     ret = FALSE;
   }
+  xd_log(LOG_INFO,
+      "Device [Bus=%03d, Dev=%03d, VID=%04X, PID=%04X, Serial=%s] unplugged from VM [UUID=%s, DomID=%d]",
+      device->busid,
+      device->devid,
+      device->vendorid,
+      device->deviceid,
+      device->serial,
+      device->vm->uuid,
+      device->vm->domid);
 
   device->vm = NULL;
 

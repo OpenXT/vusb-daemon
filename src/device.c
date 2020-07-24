@@ -288,6 +288,15 @@ device_unplug_all_from_vm(int domid)
     device = list_entry(pos, device_t, list);
     if (device->vm != NULL && device->vm->domid == domid) {
       res |= usbowls_unplug_device(domid, device->busid, device->devid);
+      xd_log(LOG_INFO,
+          "Device [Bus=%03d, Dev=%03d, VID=%04X, PID=%04X, Serial=%s] unplugged from VM [UUID=%s, DomID=%d]",
+          device->busid,
+          device->devid,
+          device->vendorid,
+          device->deviceid,
+          device->serial,
+          device->vm->uuid,
+          domid);
       device->vm = NULL;
     }
   }

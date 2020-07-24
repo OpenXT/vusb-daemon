@@ -79,7 +79,7 @@ udev_settle(void)
     if (udev_queue_get_queue_is_empty(queue)) {
       break;
     }
-    xd_log(LOG_INFO, "udev queue is not empty, retrying for %f seconds...", 0.5 - i * 0.05);
+    xd_log(LOG_DEBUG, "udev queue is not empty, retrying for %f seconds...", 0.5 - i * 0.05);
     /* Sleep for 0.05 seconds 10 times before giving up */
     usleep(50000);
   }
@@ -613,42 +613,40 @@ udev_event(void)
   dev = udev_monitor_receive_device(udev_mon);
   if (dev) {
     action = udev_device_get_action(dev);
-    xd_log(LOG_INFO, "Got Device");
-    xd_log(LOG_INFO, "   Node: %s", udev_device_get_devnode(dev));
-    xd_log(LOG_INFO, "   Path: %s", udev_device_get_devpath(dev));
-    xd_log(LOG_INFO, "   Subsystem: %s", udev_device_get_subsystem(dev));
-    xd_log(LOG_INFO, "   Sysname: %s", udev_device_get_sysname(dev));
-    xd_log(LOG_INFO, "   Devtype: %s", udev_device_get_devtype(dev));
-    xd_log(LOG_INFO, "   Action: %s", action);
     if (!strcmp(action, "add")) {
       device = udev_maybe_add_device(dev, 1);
       if (device != NULL) {
-        xd_log(LOG_INFO, "   Mouse: %d", !!(device->type & MOUSE));
-        xd_log(LOG_INFO, "   Keyboard: %d", !!(device->type & KEYBOARD));
-        xd_log(LOG_INFO, "   Joystick: %d", !!(device->type & GAME_CONTROLLER));
-        xd_log(LOG_INFO, "   MassStorage: %d", !!(device->type & MASS_STORAGE));
-        xd_log(LOG_INFO, "   Optical: %d", !!(device->type & OPTICAL));
-        xd_log(LOG_INFO, "ADDED");
         /* We keep a reference to the udev device, mainly for advanced rule-matching */
         /* udev_device_unref(dev); */
         /* Tell the "USB manager" about the new device. */
         usbmanager_device_added(device);
+        xd_log(LOG_INFO,
+            "Device %s [Bus=%03d, Dev=%03d, VID=%04X, PID=%04X, Serial=%s] available for assignment",
+            udev_device_get_sysname(dev),
+            device->busid,
+            device->devid,
+            device->vendorid,
+            device->deviceid,
+            device->serial);
       } else {
         /* This seems to happen when a device is quickly plugged and
          * unplugged. */
-        xd_log(LOG_INFO, "NOT ADDED");
+        xd_log(LOG_WARNING, "Device [%s] not added",
+            udev_device_get_sysnum(dev));
         udev_device_unref(dev);
       }
     }
     if (!strcmp(action, "remove")) {
       if (udev_del_device(dev) == 0)
-        xd_log(LOG_INFO, "REMOVED");
+        xd_log(LOG_INFO, "Device %s no longer available for assignment",
+            udev_device_get_sysname(dev));
       else
-        xd_log(LOG_INFO, "NOT REMOVED");
+        xd_log(LOG_WARNING, "Device %s disconnected but not removed",
+            udev_device_get_sysname(dev));
       udev_device_unref(dev);
     }
   }
   else {
-    xd_log(LOG_INFO, "No Device from receive_device(). An error occured.");
+    xd_log(LOG_ERR, "No Device from receive_device(). An error occured.");
   }
 }

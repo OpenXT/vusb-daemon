@@ -388,6 +388,13 @@ policy_set_sticky(int dev)
       new_rule->pos = rule->pos - 1;
     break;
   }
+  xd_log(LOG_INFO,
+      "Created automatic assignment rule [%d] for device [VID=%04X, PID=%04X, Serial=%s] to VM [UUID=%s]",
+      new_rule->pos,
+      device->vendorid,
+      device->deviceid,
+      device->serial,
+      new_rule->vm_uuid);
   list_add(&new_rule->list, &rules.list);
 
   db_write_policy(&rules);
@@ -418,6 +425,7 @@ policy_unset_sticky(int dev)
   if (rule == NULL)
     return -1;
   list_del(&rule->list);
+  xd_log(LOG_INFO, "Policy %d removed", rule->pos);
   policy_free_rule(rule);
   db_write_policy(&rules);
 
@@ -454,7 +462,7 @@ policy_get_sticky_uuid(int dev)
  * Check if the policy allows a given device to be assigned to a given VM
  */
 bool
-policy_is_allowed(device_t *device, vm_t *vm)
+policy_is_allowed(device_t *device, vm_t *vm, rule_t **rule_ptr)
 {
   struct list_head *pos;
   rule_t *rule;
@@ -464,10 +472,47 @@ policy_is_allowed(device_t *device, vm_t *vm)
     /* First match wins (or looses), ALWAYS/DEFAULT implies ALLOW */
     if (device_matches_rule(rule, device) &&
         vm_matches_rule(rule, vm))
-      return (rule->cmd != DENY);
+    {
+      if (rule->cmd != DENY) {
+        xd_log(LOG_INFO,
+            "Assignment of device [Bus=%03d, Dev=%03d, VID=%04X, PID=%04X, Serial=%s] to VM [UUID=%s], allowed by rule %d",
+            device->busid,
+            device->devid,
+            device->vendorid,
+            device->deviceid,
+            device->serial,
+            vm->uuid,
+            rule->pos);
+        if (rule_ptr != NULL)
+          *rule_ptr = rule;
+        return true;
+      }
+      else {
+        xd_log(LOG_INFO,
+            "Assignment of device [Bus=%03d, Dev=%03d, VID=%04X, PID=%04X, Serial=%s] to VM [UUID=%s], denied by rule %d",
+            device->busid,
+            device->devid,
+            device->vendorid,
+            device->deviceid,
+            device->serial,
+            vm->uuid,
+            rule->pos);
+        if (rule_ptr != NULL)
+          *rule_ptr = rule;
+        return false;
+      }
+    }
   }
 
   /* No match found, default to DENY. Return TRUE here to default to ALLOW */
+  xd_log(LOG_INFO,
+    "No rule qualifying assignment of device [Bus=%03d, Dev=%03d, VID=%04X, PID=%04X, Serial=%s] to VM [UUID=%s], implicitly denying",
+    device->busid,
+    device->devid,
+    device->vendorid,
+    device->deviceid,
+    device->serial,
+    vm->uuid);
   return false;
 }
 
@@ -517,11 +562,21 @@ policy_auto_assign_new_device(device_t *device)
   if (vm != NULL &&
       vm->domid > 0 &&
       vm->domid != uivm &&
-      policy_is_allowed(device, vm)) {
+      policy_is_allowed(device, vm, &rule)) {
     device->vm = vm;
     res = usbowls_plug_device(vm->domid, device->busid, device->devid);
     if (res != 0)
       device->vm = NULL;
+    xd_log(LOG_INFO,
+        "Automatically assigned device [Bus=%03d, Dev=%03d, VID=%04X, PID=%04X, Serial=%s] to VM [UUID=%s, DomID=%d], according to policy rule %d",
+        device->busid,
+        device->devid,
+        device->vendorid,
+        device->deviceid,
+        device->serial,
+        vm->uuid,
+        vm->domid,
+        rule->pos);
   }
 
   return res;
@@ -581,6 +636,16 @@ policy_auto_assign_devices_to_new_vm(vm_t *vm)
           /* No need to check the policy, ALWAYS implies ALLOW */
           device->vm = vm;
           ret |= -usbowls_plug_device(vm->domid, device->busid, device->devid);
+          xd_log(LOG_INFO,
+              "Automatically assigned device [Bus=%03d, Dev=%03d, VID=%04X, PID=%04X, Serial=%s] to VM [UUID=%s, DomID=%d], according to policy rule %d",
+              device->busid,
+              device->devid,
+              device->vendorid,
+              device->deviceid,
+              device->serial,
+              rule->vm_uuid,
+              vm->domid,
+              rule->pos);
         }
       }
     }

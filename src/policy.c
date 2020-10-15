@@ -473,7 +473,7 @@ policy_is_allowed(device_t *device, vm_t *vm, rule_t **rule_ptr)
     if (device_matches_rule(rule, device) &&
         vm_matches_rule(rule, vm))
     {
-      if (rule->cmd != DENY) {
+      if (rule->cmd != DENY && rule->cmd != UNKNOWN) {
         xd_log(LOG_INFO,
             "Assignment of device [Bus=%03d, Dev=%03d, VID=%04X, PID=%04X, Serial=%s] to VM [UUID=%s], allowed by rule %d",
             device->busid,
@@ -667,10 +667,10 @@ policy_parse_command_string(const char* cmd)
 {
   if (cmd == NULL || cmd[0] == '\0') return DENY;
 
-  if (strcmp(cmd, "allow") == 0) return ALLOW;
-  if (strcmp(cmd, "always") == 0) return ALWAYS;
-  if (strcmp(cmd, "default") == 0) return DEFAULT;
-  if (strcmp(cmd, "deny") == 0) return DENY;
+  if (strcasecmp(cmd, "allow") == 0) return ALLOW;
+  if (strcasecmp(cmd, "always") == 0) return ALWAYS;
+  if (strcasecmp(cmd, "default") == 0) return DEFAULT;
+  if (strcasecmp(cmd, "deny") == 0) return DENY;
 
   return UNKNOWN;
 }

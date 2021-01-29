@@ -13,3 +13,6 @@ depcomp
 install-sh
 missing
 compile
+*~
+oe-logs
+oe-workdir

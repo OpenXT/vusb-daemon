@@ -715,7 +715,7 @@ void xsdev_write(device_t *dev)
   free(path);
 }
 
-void xsdev_remove(char *path)
+static void xsdev_remove_one(char *path)
 {
   int busid;
   int devid;
@@ -741,6 +741,23 @@ void xsdev_remove(char *path)
 
   xd_log(LOG_INFO, "%s removing dev%d-%d", __func__, busid, devid);
   common_del_device(busid, devid);
+}
+
+static void xsdev_remove_all(char *path)
+{
+  device_t *device, *tmp;
+  list_for_each_entry_safe(device, tmp, &devices.list, list) {
+    common_del_device(device->busid, device->devid);
+  }
+}
+
+static void xsdev_remove(char *path)
+{
+  if (strcmp(path, watch_path) == 0) {
+      xsdev_remove_all(path);
+  } else {
+      xsdev_remove_one(path);
+  }
 }
 
 void
@@ -948,7 +965,7 @@ xenstore_event()
 
   if (strcmp(watch_token, token) == 0) {
     /* Ignore a watch event that doesn't have a child */
-    if (watch_path == NULL || strcmp(watch_path, path) == 0) {
+    if (watch_path == NULL) {
       goto free_ret;
     }
 

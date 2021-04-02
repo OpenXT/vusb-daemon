@@ -125,6 +125,8 @@ main(int argc, char *argv[]) {
       return -1;
     }
 
+    xenstore_state_handle();
+
     /* Populate the VM list */
     fill_vms();
   }

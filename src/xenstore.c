@@ -39,6 +39,8 @@ char *watch_path;
 char *watch_token = "usb_dev_watch";
 #define ASSIGN_PREFIX "assign:"
 
+static struct xs_handle *xs_state_handle;
+
 static void*
 xmalloc(size_t size)
 {
@@ -360,9 +362,9 @@ wait_for_states(char *bepath, char *fepath, enum XenBusStates a, enum XenBusStat
   fstate = malloc(fstatelen);
   snprintf(bstate, bstatelen, "%s/state", bepath);
   snprintf(fstate, fstatelen, "%s/state", fepath);
-  xs_watch(xs_handle, bstate, bstate);
-  xs_watch(xs_handle, fstate, fstate);
-  fd = xs_fileno(xs_handle);
+  xs_watch(xs_state_handle, bstate, bstate);
+  xs_watch(xs_state_handle, fstate, fstate);
+  fd = xs_fileno(xs_state_handle);
   while (tv.tv_sec != 0 || tv.tv_usec != 0)
   {
     int bs, fs;
@@ -377,10 +379,10 @@ wait_for_states(char *bepath, char *fepath, enum XenBusStates a, enum XenBusStat
     if (!FD_ISSET(fd, &set))
       continue;
     /* Read the watch to drain the buffer */
-    watch_paths = xs_read_watch(xs_handle, &len);
+    watch_paths = xs_read_watch(xs_state_handle, &len);
     free(watch_paths);
 
-    buf = xs_read(xs_handle, XBT_NULL, bstate, NULL);
+    buf = xs_read(xs_state_handle, XBT_NULL, bstate, NULL);
     if (buf == NULL) {
       /* The backend tree is gone, probably because the VM got
        * shutdown and the toolstack cleaned it out. Let's pretend
@@ -391,7 +393,7 @@ wait_for_states(char *bepath, char *fepath, enum XenBusStates a, enum XenBusStat
       bs = *buf - '0';
       free(buf);
     }
-    buf = xs_read(xs_handle, XBT_NULL, fstate, NULL);
+    buf = xs_read(xs_state_handle, XBT_NULL, fstate, NULL);
     if (buf == NULL) {
       /* Same as above */
       ret = 1;
@@ -407,8 +409,8 @@ wait_for_states(char *bepath, char *fepath, enum XenBusStates a, enum XenBusStat
       break;
     }
   }
-  xs_unwatch(xs_handle, bstate, bstate);
-  xs_unwatch(xs_handle, fstate, fstate);
+  xs_unwatch(xs_state_handle, bstate, bstate);
+  xs_unwatch(xs_state_handle, fstate, fstate);
   free(bstate);
   free(fstate);
 
@@ -544,6 +546,21 @@ xenstore_init()
   free(domid_str);
 
   return xs_fileno(xs_handle);
+}
+
+int
+xenstore_state_handle()
+{
+  if (xs_state_handle == NULL) {
+    xs_state_handle = xs_daemon_open();
+  }
+
+  if (xs_state_handle == NULL) {
+    xd_log(LOG_ERR, "Failed to connect to xenstore for state_handle");
+    return -1;
+  }
+
+  return xs_fileno(xs_state_handle);
 }
 
 int

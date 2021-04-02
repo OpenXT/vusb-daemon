@@ -230,6 +230,7 @@ void  xenstore_get_xb_states(dominfo_t *domp, usbinfo_t *usbp, int *frontst, int
 void  xenstore_list_domain_devs(dominfo_t *domp);
 int   xenstore_init(void);
 void  xenstore_deinit(void);
+int   xenstore_state_handle(void);
 void  xenstore_event(void);
 int   xenstore_new_backend(const int backend_domid);
 int   xsdev_watch_init(void);

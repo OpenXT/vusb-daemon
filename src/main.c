@@ -76,6 +76,12 @@ main() {
   INIT_LIST_HEAD(&vms.list);
   INIT_LIST_HEAD(&devices.list);
 
+  /* Initialize xenstore handle in usbowls */
+  xs_handle = NULL;
+  ret = xenstore_init();
+  if (ret != 0)
+    return ret;
+
   /* Setup dbus */
   rpc_init();
 
@@ -88,12 +94,6 @@ main() {
 
   /* Populate the VM list */
   fill_vms();
-
-  /* Initialize xenstore handle in usbowls */
-  xs_handle = NULL;
-  ret = xenstore_init();
-  if (ret != 0)
-    return ret;
 
   /* Why would we do that? */
   /* Disable driver autoprobing */

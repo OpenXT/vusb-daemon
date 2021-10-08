@@ -797,7 +797,7 @@ xsdev_add(char *path)
 
   xs_transaction_t t;
 
-  xd_log(LOG_INFO, "xenstore event %s", path);
+  xd_log(LOG_DEBUG, "xenstore event %s", path);
 
   p = strrchr(path, '/');
   if (p == NULL) {

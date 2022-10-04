@@ -470,6 +470,15 @@ udev_maybe_add_device(struct udev_device *dev, int auto_assign)
     strcpy(model, value);
   }
 
+  /* Broadcom device model has a meaningless display name.
+   * This is a hack to make it more human readable */
+  if (!strcmp(model, "58200")) {
+	  free(model);
+	  size = strlen("Broadcom 58200 Smartcard Reader") + 1;
+	  model = malloc(size);
+	  snprintf(model, size, "Broadcom 58200 Smartcard Reader");
+  }
+
   /* Look for the serial, if present (may not be). We only care about short serial,
    * as long serial is often otherwise not unique */
   value = udev_device_get_sysattr_value(dev, "serial");

@@ -46,6 +46,9 @@ enum command {
 #define GAME_CONTROLLER 0x4     /**< Game controller device type */
 #define MASS_STORAGE    0x8     /**< Mass storage device type */
 #define OPTICAL         0x10    /**< Optical (cd-rom) device type */
+#define NIC             0x20	/**< Possible NIC device type */
+#define BLUETOOTH       0x40	/**< Bluetooth device type */
+#define AUDIO           0x80	/**< Audio device type */
 
 /**
  * @brief Policy rule structure

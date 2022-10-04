@@ -131,6 +131,8 @@ class_to_device(const char *class, device_t *device)
     c = strtol(class, NULL, 16);
     if (c == 0x08)
       device->type |= MASS_STORAGE;
+    if (c == AUDIO_CLASS)
+      device->type |= AUDIO;
   }
 }
 
@@ -246,6 +248,7 @@ udev_find_more(struct udev_device *dev, device_t *device, int new)
     udev_find_more_about_input(udev_device, device);
     udev_find_more_about_class(udev_device, device);
     udev_find_more_about_optical(udev_device, device, new);
+    libusb_find_more_about_nic(device);
     udev_device_unref(udev_device);
   }
 

@@ -138,6 +138,7 @@ device_is_ambiguous(device_t *device)
 device_t*
 device_add(int  busid, int  devid,
            int  vendorid, int  deviceid,
+           int  type,
            char *serial,
            char *shortname, char *longname,
            char *sysname, struct udev_device *udev)
@@ -165,10 +166,21 @@ device_add(int  busid, int  devid,
   device->sysname = sysname;
   device->udev = udev;
   device->vm = NULL; /* The UI isn't happy if the device is assigned to dom0 */
-  device->type = 0;
+  device->type = type;
   list_add(&device->list, &devices.list);
 
   return device;
+}
+
+void device_free(device_t *device)
+{
+  free(device->shortname);
+  free(device->longname);
+  free(device->sysname);
+  free(device->serial);
+  /* udev_device_unref is okay when udev is NULL */
+  udev_device_unref(device->udev);
+  free(device);
 }
 
 /**
@@ -194,11 +206,8 @@ device_del(int  busid,
   }
   if (device != NULL && device->busid == busid && device->devid == devid) {
     list_del(pos);
-    free(device->shortname);
-    free(device->longname);
-    free(device->sysname);
-    udev_device_unref(device->udev);
-    free(device);
+    xsdev_del(device);
+    device_free(device);
   } else {
     xd_log(LOG_ERR, "Device not found: %d-%d", busid, devid);
     return -1;

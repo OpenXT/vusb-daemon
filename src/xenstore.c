@@ -27,11 +27,19 @@
  */
 
 #include "project.h"
+#include <xen/xen.h>
 
 /**
- * The xenstore dom0 path, set by xenstore_init()
+ * The xenstore USB backend domain path, set by xenstore_init()
  */
-char *xs_dom0path = NULL;
+char *xs_backend_path = NULL;
+int usb_backend_domid = 0;
+int my_domid = -1;
+char *watch_path;
+char *watch_token = "usb_dev_watch";
+#define ASSIGN_PREFIX "assign:"
+
+static struct xs_handle *xs_state_handle;
 
 static void*
 xmalloc(size_t size)
@@ -50,7 +58,7 @@ xmalloc(size_t size)
  * Allocating formatted string print.
  * The caller is responsible for returning the returned string.
  */
-static char *
+char *
 xasprintf(const char *fmt, ...)
 {
   char *s;
@@ -195,7 +203,7 @@ xenstore_dev_fepath(dominfo_t *domp, char *type, int devnum)
 static char*
 xenstore_dev_bepath(dominfo_t *domp, char *type, int devnum)
 {
-  return (xasprintf("%s/backend/%s/%d/%d", xs_dom0path, type,
+  return (xasprintf("%s/backend/%s/%d/%d", xs_backend_path, type,
                     domp->di_domid, devnum));
 }
 
@@ -230,7 +238,7 @@ xenstore_list_domain_devs(dominfo_t *domp)
   int domid = domp->di_domid;
   unsigned int count, i;
 
-  snprintf(xpath, sizeof(xpath), "/local/domain/0/backend/vusb/%d", domid);
+  snprintf(xpath, sizeof(xpath), "%s/backend/vusb/%d", xs_backend_path, domid);
   devs = xs_directory(xs_handle, XBT_NULL, xpath, &count);
   if (devs) {
     for (i = 0; i < count; ++i) {
@@ -274,17 +282,18 @@ xenstore_create_usb(dominfo_t *domp, usbinfo_t *usbp)
     /*
      * Make directories for both front and back ends
      */
-    if (xenstore_add_dir(trans, bepath, 0, XS_PERM_NONE, domp->di_domid,
-                         XS_PERM_READ))
+    if (xenstore_add_dir(trans, bepath, usb_backend_domid, XS_PERM_NONE,
+                         domp->di_domid, XS_PERM_READ))
       break;
-    if (xenstore_add_dir(trans, fepath, domp->di_domid, XS_PERM_NONE, 0,
-                         XS_PERM_READ))
+    if (xenstore_add_dir(trans, fepath, domp->di_domid, XS_PERM_NONE,
+                         usb_backend_domid, XS_PERM_READ))
       break;
 
     /*
      * Populate frontend device info
      */
-    if (xenstore_set_keyval(trans, fepath, "backend-id", "0"))
+    snprintf(value, sizeof(value), "%d", usb_backend_domid);
+    if (xenstore_set_keyval(trans, fepath, "backend-id", value))
       break;
     snprintf(value, sizeof (value), "%d", usbp->usb_virtid);
     if (xenstore_set_keyval(trans, fepath, "virtual-device", value))
@@ -353,9 +362,9 @@ wait_for_states(char *bepath, char *fepath, enum XenBusStates a, enum XenBusStat
   fstate = malloc(fstatelen);
   snprintf(bstate, bstatelen, "%s/state", bepath);
   snprintf(fstate, fstatelen, "%s/state", fepath);
-  xs_watch(xs_handle, bstate, bstate);
-  xs_watch(xs_handle, fstate, fstate);
-  fd = xs_fileno(xs_handle);
+  xs_watch(xs_state_handle, bstate, bstate);
+  xs_watch(xs_state_handle, fstate, fstate);
+  fd = xs_fileno(xs_state_handle);
   while (tv.tv_sec != 0 || tv.tv_usec != 0)
   {
     int bs, fs;
@@ -370,10 +379,10 @@ wait_for_states(char *bepath, char *fepath, enum XenBusStates a, enum XenBusStat
     if (!FD_ISSET(fd, &set))
       continue;
     /* Read the watch to drain the buffer */
-    watch_paths = xs_read_watch(xs_handle, &len);
+    watch_paths = xs_read_watch(xs_state_handle, &len);
     free(watch_paths);
 
-    buf = xs_read(xs_handle, XBT_NULL, bstate, NULL);
+    buf = xs_read(xs_state_handle, XBT_NULL, bstate, NULL);
     if (buf == NULL) {
       /* The backend tree is gone, probably because the VM got
        * shutdown and the toolstack cleaned it out. Let's pretend
@@ -384,7 +393,7 @@ wait_for_states(char *bepath, char *fepath, enum XenBusStates a, enum XenBusStat
       bs = *buf - '0';
       free(buf);
     }
-    buf = xs_read(xs_handle, XBT_NULL, fstate, NULL);
+    buf = xs_read(xs_state_handle, XBT_NULL, fstate, NULL);
     if (buf == NULL) {
       /* Same as above */
       ret = 1;
@@ -400,8 +409,8 @@ wait_for_states(char *bepath, char *fepath, enum XenBusStates a, enum XenBusStat
       break;
     }
   }
-  xs_unwatch(xs_handle, bstate, bstate);
-  xs_unwatch(xs_handle, fstate, fstate);
+  xs_unwatch(xs_state_handle, bstate, bstate);
+  xs_unwatch(xs_state_handle, fstate, fstate);
   free(bstate);
   free(fstate);
 
@@ -500,30 +509,82 @@ xenstore_destroy_usb(dominfo_t *domp, usbinfo_t *usbp)
 /**
  * Initialize the xenstore bits
  *
- * @return 0 on success, 1 on failure
+ * @return xenstorefd (>= 0) on success, -1 on failure
  */
 int
-xenstore_init(void)
+xenstore_init()
 {
+  unsigned int len;
+  char *domid_str, *endptr;
+
   if (xs_handle == NULL) {
     xs_handle = xs_daemon_open();
   }
 
   if (xs_handle == NULL) {
     xd_log(LOG_ERR, "Failed to connect to xenstore");
-    return 1;
+    return -1;
   }
 
-  if (xs_dom0path == NULL) {
-    xs_dom0path = xs_get_domain_path(xs_handle, 0);
+  xs_backend_path = xs_get_domain_path(xs_handle, usb_backend_domid);
+
+  domid_str = xs_read(xs_handle, XBT_NULL, "domid", &len);
+  if (domid_str == NULL) {
+    xd_log(LOG_ERR, "Failed to read domid");
+    return -1;
   }
 
-  if (xs_dom0path == NULL) {
-    xd_log(LOG_ERR, "Could not get domain 0 path from XenStore");
-    return 1;
+  my_domid = strtol(domid_str, &endptr, 10);
+  if (my_domid < 0 || my_domid >= DOMID_FIRST_RESERVED || endptr[0] != '\0') {
+    xd_log(LOG_ERR, "domid string '%s' is not a valid number", domid_str);
+    free(domid_str);
+    return -1;
   }
 
-  return 0;
+  xd_log(LOG_INFO, "Running in domain %d", my_domid);
+
+  free(domid_str);
+
+  return xs_fileno(xs_handle);
+}
+
+int
+xenstore_state_handle()
+{
+  if (xs_state_handle == NULL) {
+    xs_state_handle = xs_daemon_open();
+  }
+
+  if (xs_state_handle == NULL) {
+    xd_log(LOG_ERR, "Failed to connect to xenstore for state_handle");
+    return -1;
+  }
+
+  return xs_fileno(xs_state_handle);
+}
+
+int
+xenstore_new_backend(const int backend_domid)
+{
+  int ret;
+
+  if (backend_domid != usb_backend_domid) {
+    free(xs_backend_path);
+    xs_backend_path = xs_get_domain_path(xs_handle, backend_domid);
+
+    if (xs_backend_path == NULL) {
+      xd_log(LOG_ERR, "Could not get backend path from XenStore");
+      return 1;
+    }
+
+    usb_backend_domid = backend_domid;
+  }
+
+  /* Redo the watches! */
+  xsdev_watch_deinit();
+  xsdev_watch_init();
+
+  return ret;
 }
 
 /**
@@ -535,4 +596,407 @@ xenstore_deinit(void)
 {
   xs_daemon_close(xs_handle);
   xs_handle = NULL;
+}
+
+void
+xsdev_watch_deinit(void)
+{
+  if (watch_path) {
+    xs_unwatch(xs_handle, watch_path, watch_token);
+    free(watch_path);
+    watch_path = NULL;
+  }
+}
+
+/* Returns true (1) on success, false (0) on failure. */
+int
+xsdev_watch_init(void)
+{
+  if (usb_backend_domid > 0) {
+    watch_path = xasprintf("%s/data/usb", xs_backend_path);
+    return xs_watch(xs_handle, watch_path, watch_token);
+  }
+
+  return 1;
+}
+
+void xsdev_del(device_t *dev)
+{
+  if (g_xcbus) {
+    return;
+  }
+
+  xd_log(LOG_INFO, "%s %d %d %s", __func__, dev->busid, dev->devid,
+         dev->sysname);
+
+  char *path = xasprintf("data/usb/dev%d-%d", dev->busid, dev->devid);
+  if (path == NULL) {
+    xd_log(LOG_ERR, "%s: xasprintf path failed", __func__);
+    return;
+  }
+
+  char *vusb_watch = xasprintf("%s/assign", path);
+  char *vusb_token = xasprintf(ASSIGN_PREFIX"%x %x", dev->vendorid,
+                 dev->deviceid);
+
+  xs_unwatch(xs_handle, vusb_watch, vusb_token);
+
+  free(vusb_watch);
+  free(vusb_token);
+
+  if (xs_rm(xs_handle, XBT_NULL, path) == false) {
+    xd_log(LOG_ERR, "failure xs_rm(%s)", path);
+  }
+
+  free(path);
+}
+
+void xsdev_write(device_t *dev)
+{
+  xs_transaction_t t;
+
+  if (g_xcbus) {
+    return;
+  }
+
+  xd_log(LOG_INFO, "%s %d %d %s", __func__, dev->busid, dev->devid,
+         dev->sysname);
+
+  char *path = xasprintf("data/usb/dev%d-%d", dev->busid, dev->devid);
+  if (path == NULL) {
+    xd_log(LOG_ERR, "%s: xasprintf path failed", __func__);
+    return;
+  }
+
+  xenstore_add_dir(XBT_NULL, "data/usb", my_domid, XS_PERM_NONE,
+                             0, XS_PERM_READ);
+
+  /* TODO Add transaction abort? */
+ restart:
+  t = xs_transaction_start(xs_handle);
+
+  xs_mkdir(xs_handle, t, path);
+
+#define xs_write_fmt(fmt, v) { \
+  char *_path = xasprintf("%s/%s", path, #v); \
+  char *_v = xasprintf(fmt, dev->v); \
+  xs_write(xs_handle, t, _path, _v, strlen(_v)); \
+  free(_v); \
+  free(_path); }
+#define xs_write_int(v) xs_write_fmt("%d", v)
+#define xs_write_hex(v) xs_write_fmt("%#x", v)
+
+  xs_write_int(busid);
+  xs_write_int(devid);
+  xs_write_hex(vendorid);
+  xs_write_hex(deviceid);
+  xs_write_hex(type);
+
+#define xs_write_string(v) { \
+  if (dev->v) { \
+    char *_path = xasprintf("%s/%s", path, #v); \
+    xs_write(xs_handle, t, _path, dev->v, strlen(dev->v)); \
+    free(_path); } \
+  }
+
+  xs_write_string(serial);
+  xs_write_string(shortname);
+  xs_write_string(longname);
+  xs_write_string(sysname);
+
+#undef xs_write_string
+#undef xs_write_int
+#undef xs_write_hex
+#undef xs_write_fmt
+
+  if (xs_transaction_end(xs_handle, t, false) == false) {
+    if (errno == EAGAIN) {
+      goto restart;
+    }
+    xd_log(LOG_ERR, "%s xs_transaction_failed errno=%d (%s)",
+           __func__, errno, strerror(errno));
+    xs_transaction_end(xs_handle, t, true);
+  }
+
+  char *vusb_watch = xasprintf("%s/assign", path);
+  char *vusb_token = xasprintf("assign:%x %x", dev->vendorid,
+                 dev->deviceid);
+
+  if (xs_watch(xs_handle, vusb_watch, vusb_token) == false) {
+    xd_log(LOG_ERR, "%s failed to add %s xs_watch", __func__,
+           vusb_watch);
+  }
+
+  free(vusb_watch);
+  free(vusb_token);
+  free(path);
+}
+
+static void xsdev_remove_one(char *path)
+{
+  int busid;
+  int devid;
+  int num;
+  char *p;
+
+  xd_log(LOG_INFO, "%s path=%s", __func__, path);
+
+  p = strrchr(path, '/');
+  if (p == NULL) {
+    xd_log(LOG_ERR, "could not find '/' in path=%s", path);
+
+    return;
+  }
+  p++;
+
+  num = sscanf(p, "dev%d-%d", &busid, &devid);
+  if (num != 2) {
+    xd_log(LOG_ERR, "%s could not parse path=%s", __func__, path);
+
+    return;
+  }
+
+  xd_log(LOG_INFO, "%s removing dev%d-%d", __func__, busid, devid);
+  common_del_device(busid, devid);
+}
+
+static void xsdev_remove_all(char *path)
+{
+  device_t *device, *tmp;
+  list_for_each_entry_safe(device, tmp, &devices.list, list) {
+    common_del_device(device->busid, device->devid);
+  }
+}
+
+static void xsdev_remove(char *path)
+{
+  if (strcmp(path, watch_path) == 0) {
+      xsdev_remove_all(path);
+  } else {
+      xsdev_remove_one(path);
+  }
+}
+
+void
+xsdev_add(char *path)
+{
+  device_t *dev;
+  unsigned int len;
+  char *p;
+  int busid;
+  int devid;
+  int vendorid;
+  int deviceid;
+  char *serial;
+  char *shortname;
+  char *longname;
+  char *sysname;
+  int type;
+  int num;
+
+
+  xs_transaction_t t;
+
+  xd_log(LOG_DEBUG, "xenstore event %s", path);
+
+  p = strrchr(path, '/');
+  if (p == NULL) {
+    xd_log(LOG_ERR, "%s could not find '/' path=%s", __func__, path);
+
+    return;
+  }
+  p++;
+
+  num = sscanf(p, "dev%d-%d", &busid, &devid);
+  if (num != 2) {
+    xd_log(LOG_DEBUG, "%s could not parse path=%s", __func__, path);
+
+    return;
+  }
+
+ restart:
+  t = xs_transaction_start(xs_handle);
+
+#define xs_read_int(v) { \
+  char *_path = xasprintf("%s/%s", path, #v); \
+  char *_p = xs_read(xs_handle, t, _path, &len); \
+  v = strtol(_p, NULL, 0); \
+  free(_p); \
+  free(_path); }
+
+  xs_read_int(busid);
+  xs_read_int(devid);
+  xs_read_int(vendorid);
+  xs_read_int(deviceid);
+  xs_read_int(type);
+
+#define xs_read_string(v) { \
+  char *_path = xasprintf("%s/%s", path, #v); \
+  v = xs_read(xs_handle, t, _path, &len); \
+  free(_path); }
+
+  xs_read_string(serial);
+  xs_read_string(shortname);
+  xs_read_string(longname);
+  xs_read_string(sysname);
+
+#undef xs_read_string
+#undef xs_read_int
+
+  if (xs_transaction_end(xs_handle, t, false) == false) {
+    if (errno == EAGAIN) {
+      goto restart;
+    }
+    xd_log(LOG_ERR, "%s xs_transaction_failed errno=%d (%s)",
+           __func__, errno, strerror(errno));
+    xs_transaction_end(xs_handle, t, true);
+
+    return;
+  }
+
+  if (shortname == NULL ||
+      longname == NULL ||
+      sysname == NULL ||
+      vendorid < 0 || vendorid > 0xffff ||
+      deviceid < 0 || deviceid > 0xffff ||
+      busid == 0 ||
+      devid == 0) {
+    xd_log(LOG_ERR, "%s: skipping invalid device", __func__);
+    return;
+  }
+
+  /* Add device */
+  xd_log(LOG_INFO, "%s adding device %d:%d", __func__, busid, devid);
+  dev = device_add(busid, devid, vendorid, deviceid, type, serial,
+                   shortname, longname, sysname, NULL);
+  if (dev == NULL) {
+    xd_log(LOG_INFO, "%s: device %d:%d already added", __func__, busid, devid);
+    return;
+  }
+
+  /* We always auto-assign when the devices come through XenStore */
+  policy_auto_assign_new_device(dev);
+}
+
+void
+xsdev_event_one(char *path)
+{
+  unsigned int len;
+  char *dev_path;
+
+  dev_path = xs_read(xs_handle, 0, path, &len);
+  if (dev_path == NULL) {
+    xsdev_remove(path);
+
+    return;
+  }
+  free(dev_path);
+
+  xsdev_add(path);
+}
+
+int xsdev_fill()
+{
+  char **nodes;
+  unsigned int num;
+
+  if (watch_path == NULL) {
+    return 1;
+  }
+
+  nodes = xs_directory(xs_handle, XBT_NULL, watch_path, &num);
+  if (nodes == NULL) {
+    xd_log(LOG_ERR, "%s: failed to read xs_directory %s", __func__,
+           xs_backend_path);
+    return 0;
+  }
+
+  for (int i = 0; i < num; i++) {
+    char *path;
+
+    path = xasprintf("%s/%s", watch_path, nodes[i]);
+
+    xsdev_add(path);
+
+    free(path);
+  }
+
+  free(nodes);
+
+  return 1;
+}
+
+void xsdev_assigning(char *path, char *token)
+{
+  int vid, pid;
+  int num;
+  unsigned int len;
+  int add;
+  char *val;
+
+  xd_log(LOG_INFO, "%s: path=%s token=%s", __func__, path, token);
+
+  num = sscanf(token, "assign:%x %x", &vid, &pid);
+  if (num != 2) {
+    xd_log(LOG_ERR, "%s: Unexpected token %s", __func__, token);
+    return;
+  }
+
+  val = xs_read(xs_handle, XBT_NULL, path, &len);
+  if (val == NULL) {
+    xd_log(LOG_INFO, "%s: xs_read(%s)=NULL %04x:%04x", __func__,
+           path, vid, pid);
+    return;
+  }
+
+  if (strcmp(val, "1") == 0) {
+    add = 1;
+  } else if (strcmp(val, "0") == 0) {
+    add = 0;
+  } else {
+    xd_log(LOG_ERR, "%s: unexpected val='%s'", __func__, val);
+    goto out;
+  }
+
+  xd_log(LOG_INFO, "%s: val=%s %s %x:%x", __func__, val,
+         add ? "adding" : "removing", vid, pid);
+
+  vusb_assign_local(vid, pid, add);
+
+ out:
+  free(val);
+}
+
+void
+xenstore_event()
+{
+  char **ret;
+
+  ret = xs_check_watch(xs_handle);
+  if (ret == NULL && errno == EAGAIN) {
+    return;
+  }
+
+  char *path = ret[XS_WATCH_PATH];
+  char *token = ret[XS_WATCH_TOKEN];
+
+  if (strcmp(watch_token, token) == 0) {
+    /* Ignore a watch event that doesn't have a child */
+    if (watch_path == NULL) {
+      goto free_ret;
+    }
+
+    xsdev_event_one(path);
+  } else if (strncmp(token, ASSIGN_PREFIX, strlen(ASSIGN_PREFIX)) == 0) {
+    xsdev_assigning(path, token);
+  } else {
+    xd_log(LOG_ERR, "Unexpected token %s doesn't match our's (%s)",
+           token, watch_token);
+  }
+
+ free_ret:
+  free(ret);
+
+  /* We need to process all watch events, so recurse. */
+  xenstore_event();
 }

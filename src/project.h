@@ -93,6 +93,8 @@
 #define DOM0_UUID   "00000000-0000-0000-0000-000000000000" /**< Dom0's UUID */
 #define UIVM_UUID   "00000000-0000-0000-0000-000000000001" /**< UIVM's UUID */
 #define UIVM_PATH   "/vm/00000000_0000_0000_0000_000000000001" /**< UIVM's xenstore path */
+#define USBVM_UUID   "00000000-0000-0000-0000-000000000003" /**< USBVM's UUID */
+#define USBVM_PATH   "/vm/00000000_0000_0000_0000_000000000003" /**< USBVM's xenstore path */
 
 #define XENMGR      "com.citrix.xenclient.xenmgr" /**< The dbus name of xenmgr */
 #define XENMGR_OBJ  "/"                           /**< The main dbus object of xenmgr */
@@ -171,7 +173,10 @@ xcdbus_conn_t *g_xcbus;      /**< The global dbus (libxcdbus) handle, initialize
 vm_t vms;                    /**< The global list of VMs, handled by vm.c */
 device_t devices;            /**< The global list of devices, handled by device.c */
 struct udev *udev_handle;    /**< The global udev handle, initialized by udev_init() */
+extern int usb_backend_domid;
+extern int my_domid;
 
+int   vusb_assign_local(int vendor, int product, int add);
 int   usbowls_plug_device(int domid, int bus, int device);
 int   usbowls_unplug_device(int domid, int bus, int device);
 int   usbowls_build_usbinfo(int bus, int dev, int vendor, int product, usbinfo_t *ui);
@@ -192,13 +197,17 @@ int   udev_device_tree_match(struct udev_device *dev,
     const char *value,
     int sysattr /* 1 for sysattr, 0 for property*/);
 
-void  libusb_find_more_about_nic(device_t *device);
+int   libusb_find_more_about_nic(int vendorid, int deviceid);
+
+int   common_del_device(int busnum, int devnum);
 
 device_t* device_lookup(int busid, int devid);
 device_t* device_lookup_by_attributes(int vendorid, int deviceid, char *serial);
 int       device_is_ambiguous(device_t* device);
-device_t* device_add(int busid, int devid, int vendorid, int deviceid, char* serial,
-                     char *shortname, char *longname, char *sysname, struct udev_device *udev);
+device_t* device_add(int busid, int devid, int vendorid, int deviceid, int type,
+                     char *serial, char *shortname, char *longname,
+                     char *sysname, struct udev_device *udev);
+void      device_free(device_t *device);
 int       device_del(int  busid, int  devid);
 char*     device_type(unsigned char class, unsigned char subclass,
                       unsigned char protocol);
@@ -221,6 +230,17 @@ void  xenstore_get_xb_states(dominfo_t *domp, usbinfo_t *usbp, int *frontst, int
 void  xenstore_list_domain_devs(dominfo_t *domp);
 int   xenstore_init(void);
 void  xenstore_deinit(void);
+int   xenstore_state_handle(void);
+void  xenstore_event(void);
+int   xenstore_new_backend(const int backend_domid);
+int   xsdev_watch_init(void);
+void  xsdev_watch_deinit(void);
+void  xsdev_write(device_t *dev);
+int   xsdev_fill(void);
+void  xsdev_del(device_t *dev);
+
+char *xasprintf(const char *fmt, ...);
+extern char *xs_backend_path;
 
 int   policy_init(void);
 void  policy_add_rule(rule_t *rule);

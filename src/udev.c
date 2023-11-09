@@ -87,16 +87,17 @@ udev_settle(void)
   udev_queue_unref(queue);
 }
 
-static void
-udev_find_more_about_input(struct udev_device *udev_device,  device_t *device)
+static int
+udev_find_more_about_input(struct udev_device *udev_device)
 {
   const char *value;
+  int type = 0;
 
   /* First, check if the id_input module considered the device, to
    * avoid wasting time */
   value = udev_device_get_property_value(udev_device, "ID_INPUT");
   if (value == NULL || *value == '0')
-    return;
+    return type;
 
   /* The udev module id_input provides: */
   /* ID_INPUT_ACCELEROMETER */
@@ -109,42 +110,50 @@ udev_find_more_about_input(struct udev_device *udev_device,  device_t *device)
   /* ID_INPUT_TOUCHSCREEN */
   value = udev_device_get_property_value(udev_device, "ID_INPUT_KEYBOARD");
   if (value != NULL && *value != '0')
-    device->type |= KEYBOARD;
+    type |= KEYBOARD;
   value = udev_device_get_property_value(udev_device, "ID_INPUT_MOUSE");
   if (value != NULL && *value != '0')
-    device->type |= MOUSE;
+    type |= MOUSE;
   value = udev_device_get_property_value(udev_device, "ID_INPUT_TOUCHPAD");
   if (value != NULL && *value != '0')
-    device->type |= MOUSE;
+    type |= MOUSE;
   value = udev_device_get_property_value(udev_device, "ID_INPUT_JOYSTICK");
   if (value != NULL && *value != '0')
-    device->type |= GAME_CONTROLLER;
+    type |= GAME_CONTROLLER;
+
+  return type;
 }
 
-static void
-class_to_device(const char *class, device_t *device)
+static int
+class_to_device(const char *class)
 {
+  int type = 0;
   int c;
 
   if (class != NULL)
   {
     c = strtol(class, NULL, 16);
     if (c == 0x08)
-      device->type |= MASS_STORAGE;
+      type |= MASS_STORAGE;
     if (c == AUDIO_CLASS)
-      device->type |= AUDIO;
+      type |= AUDIO;
   }
+
+  return type;
 }
 
-static void
-udev_find_more_about_class(struct udev_device *udev_device,  device_t *device)
+static int
+udev_find_more_about_class(struct udev_device *udev_device)
 {
   const char *value;
+  int type = 0;
 
   value = udev_device_get_sysattr_value(udev_device, "bDeviceClass");
-  class_to_device(value, device);
+  type |= class_to_device(value);
   value = udev_device_get_sysattr_value(udev_device, "bInterfaceClass");
-  class_to_device(value, device);
+  type |= class_to_device(value);
+
+  return type;
 }
 
 /**
@@ -155,8 +164,8 @@ udev_find_more_about_class(struct udev_device *udev_device,  device_t *device)
  * so they'll get probed too for nothing... Maybe in the future we can
  * gather advanced info about them here, for super-advanced filtering!
  */
-static void
-udev_find_more_about_optical(struct udev_device *udev_device,  device_t *device, int new)
+static int
+udev_find_more_about_optical(struct udev_device *udev_device, int type, int new)
 {
   struct udev_monitor *mon;
   struct timeval tv;
@@ -172,21 +181,21 @@ udev_find_more_about_optical(struct udev_device *udev_device,  device_t *device,
    * For every scsi devices, wait for a second udev pass */
 
   /* If the device is already an optical drive we're good */
-  if (device->type & OPTICAL)
-    return;
+  if (type & OPTICAL)
+    return type | OPTICAL;
 
   /* Check if the device is scsi */
   value = udev_device_get_devtype(udev_device);
   if (value == NULL || strcmp(value, "scsi_host")) {
-    return;
+    return type;
   }
 
   /* If the device didn't just appear, we can assume everything is ready */
   if (!new) {
     value = udev_device_get_property_value(udev_device, "ID_CDROM");
     if (value != NULL && *value != '0')
-      device->type |= OPTICAL;
-    return;
+      type |= OPTICAL;
+    return type;
   }
 
   /* Create a udev monitor to wait for some "block" action for 3 seconds */
@@ -215,7 +224,7 @@ udev_find_more_about_optical(struct udev_device *udev_device,  device_t *device,
     value = udev_device_get_property_value(udev_child, "ID_CDROM");
     if (value != NULL) {
       if (*value != '0')
-        device->type |= OPTICAL;
+        type |= OPTICAL;
       udev_device_unref(udev_child);
       break;
     }
@@ -224,19 +233,22 @@ udev_find_more_about_optical(struct udev_device *udev_device,  device_t *device,
 
   /* Cleanup */
   udev_enumerate_unref(enumerate);
+
+  return type;
 }
 
 /**
  * Look at all the childs of a given device to figure out more about
  * what it does
  */
-static void
-udev_find_more(struct udev_device *dev, device_t *device, int new)
+static int
+udev_find_more(struct udev_device *dev, int new)
 {
   struct udev_enumerate *enumerate;
   struct udev_list_entry *udev_device_list, *udev_device_entry;
   struct udev_device *udev_device;
   const char *path;
+  int type = 0;
 
   enumerate = udev_enumerate_new(udev_handle);
   udev_enumerate_add_match_parent(enumerate, dev);
@@ -245,15 +257,16 @@ udev_find_more(struct udev_device *dev, device_t *device, int new)
   udev_list_entry_foreach(udev_device_entry, udev_device_list) {
     path = udev_list_entry_get_name(udev_device_entry);
     udev_device = udev_device_new_from_syspath(udev_handle, path);
-    udev_find_more_about_input(udev_device, device);
-    udev_find_more_about_class(udev_device, device);
-    udev_find_more_about_optical(udev_device, device, new);
-    libusb_find_more_about_nic(device);
+    type |= udev_find_more_about_input(udev_device);
+    type |= udev_find_more_about_class(udev_device);
+    type |= udev_find_more_about_optical(udev_device, type, new);
     udev_device_unref(udev_device);
   }
 
   /* Cleanup */
   udev_enumerate_unref(enumerate);
+
+  return type;
 }
 
 int
@@ -357,6 +370,7 @@ udev_maybe_add_device(struct udev_device *dev, int auto_assign)
   const char *value;
   int busnum, devnum;
   int vendorid, deviceid;
+  int type;
   char *serial = NULL;
   char *vendor = NULL;
   char *model;
@@ -490,20 +504,21 @@ udev_maybe_add_device(struct udev_device *dev, int auto_assign)
     strcpy(serial, value);
   }
 
+  /* Find out more about the device by looking at its children */
+  type = udev_find_more(dev, auto_assign);
+  type |= libusb_find_more_about_nic(vendorid, deviceid);
+
   /* Finally add the device */
   device = device_add(busnum, devnum,
                       vendorid, deviceid,
+                      type,
                       serial,
                       model, vendor,
                       sysname, dev);
-  if (device == NULL)
-    return NULL;
 
-  /* Find out more about the device by looking at its children */
-  udev_find_more(dev, device, auto_assign);
-
-  if (auto_assign > 0)
-    policy_auto_assign_new_device(device);
+  if (device) {
+    xsdev_write(device);
+  }
 
   return device;
 }
@@ -534,28 +549,20 @@ udev_node_to_ids(const char *node, int *busid, int *devid)
 }
 
 /**
- * Cleanup xenstore and delete a device after a udev removal event.
+ * Cleanup xenstore and delete a device after removal.
  *
- * @param dev Udev handle of the device
+ * @param busnum of device
+ * @param devnum of device
  *
  * @return 0 on success, 1 if nothing happened, -1 on failure
  */
 int
-udev_del_device(struct udev_device *dev)
+common_del_device(int busnum, int devnum)
 {
-  const char *node;
-  int busnum;
-  int devnum;
   usbinfo_t ui;
   dominfo_t di;
   device_t *device;
   int ret;
-
-  /* Find the bus and device IDs */
-  node = udev_device_get_devnode(dev);
-  if (node == NULL)
-    return -1;
-  udev_node_to_ids(node, &busnum, &devnum);
 
   /* Cleanup xenstore if the device was assigned to a VM */
   device = device_lookup(busnum, devnum);
@@ -577,6 +584,29 @@ udev_del_device(struct udev_device *dev)
     usbmanager_device_removed();
 
   return ret;
+}
+
+/**
+ * Cleanup xenstore and delete a device after a udev removal event.
+ *
+ * @param dev Udev handle of the device
+ *
+ * @return 0 on success, 1 if nothing happened, -1 on failure
+ */
+int
+udev_del_device(struct udev_device *dev)
+{
+  const char *node;
+  int busnum;
+  int devnum;
+
+  /* Find the bus and device IDs */
+  node = udev_device_get_devnode(dev);
+  if (node == NULL)
+    return -1;
+  udev_node_to_ids(node, &busnum, &devnum);
+
+  return common_del_device(busnum, devnum);
 }
 
 /**
@@ -621,6 +651,7 @@ udev_event(void)
   struct udev_device *dev;
   const char *action;
   device_t *device;
+  int auto_assign = my_domid == 0;
 
   dev = udev_monitor_receive_device(udev_mon);
   if (dev) {
@@ -640,6 +671,9 @@ udev_event(void)
             device->vendorid,
             device->deviceid,
             device->serial);
+
+        if (auto_assign)
+          policy_auto_assign_new_device(device);
       } else {
         /* This seems to happen when a device is quickly plugged and
          * unplugged. */

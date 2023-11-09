@@ -63,14 +63,36 @@ static void fill_vms()
   g_ptr_array_free(paths, TRUE);
 }
 
+int dbus_pre_select(int nfds, fd_set *readfds, fd_set *writefds,
+                    fd_set *exceptfds)
+{
+  if (g_xcbus == NULL) {
+    return nfds;
+  }
+
+  return xcdbus_pre_select(g_xcbus, nfds, readfds, writefds, exceptfds);
+}
+
+void dbus_post_select(int nfds, fd_set *readfds, fd_set *writefds,
+                     fd_set *exceptfds)
+{
+  if (g_xcbus == NULL) {
+    return;
+  }
+
+  xcdbus_post_select(g_xcbus, nfds, readfds, writefds, exceptfds);
+}
+
 int
-main() {
+main(int argc, char *argv[]) {
   int ret;
   fd_set readfds;
   fd_set writefds;
   fd_set exceptfds;
   int nfds;
+  int xsfd;
   int udevfd;
+  int dbus = 1;
 
   /* init libusb */
   usb_init();
@@ -79,24 +101,35 @@ main() {
   INIT_LIST_HEAD(&vms.list);
   INIT_LIST_HEAD(&devices.list);
 
-  /* Initialize xenstore handle in usbowls */
-  xs_handle = NULL;
-  ret = xenstore_init();
-  if (ret != 0)
-    return ret;
-
-  /* Setup dbus */
-  rpc_init();
-
-  /* Load the policy bits */
-  ret = policy_init();
-  if (ret != 0) {
-    xd_log(LOG_ERR, "Unable to initialize the policy bits");
-    return -1;
+  if (argc > 1 && strcmp(argv[1], "stub-mode") == 0) {
+    xd_log(LOG_INFO, "Running in stub-mode (no D-Bus)");
+    dbus = 0;
+    g_xcbus = NULL;
+  } else {
+    xd_log(LOG_INFO, "Running in full mode with D-Bus");
   }
 
-  /* Populate the VM list */
-  fill_vms();
+  xs_handle = NULL;
+  xsfd = xenstore_init();
+  if (xsfd == -1)
+    return -1;
+
+  if (dbus) {
+    /* Setup dbus */
+    rpc_init();
+
+    /* Load the policy bits */
+    ret = policy_init();
+    if (ret != 0) {
+      xd_log(LOG_ERR, "Unable to initialize the policy bits");
+      return -1;
+    }
+
+    xenstore_state_handle();
+
+    /* Populate the VM list */
+    fill_vms();
+  }
 
   /* Why would we do that? */
   /* Disable driver autoprobing */
@@ -115,6 +148,16 @@ main() {
   /* Populate the USB device list */
   udev_fill_devices();
 
+  ret = xsdev_watch_init();
+  if (ret == 0) {
+    xd_log(LOG_ERR, "Unable to initialize xenstore device watch");
+  }
+
+  ret = xsdev_fill();
+  if (ret == 0) {
+    xd_log(LOG_ERR, "Unable to populate devices from xenstore");
+  }
+
   /* Setup libusb */
   /* if (libusb_init(NULL) != 0) { */
   /*   xd_log(LOG_ERR, "Unable to initialize libusb"); */
@@ -129,13 +172,19 @@ main() {
     FD_ZERO(&exceptfds);
 
     FD_SET(udevfd, &readfds);
-    nfds = udevfd + 1;
+    FD_SET(xsfd, &readfds);
+    nfds = xsfd > udevfd ? xsfd : udevfd;
+    nfds = nfds + 1;
 
-    nfds = xcdbus_pre_select(g_xcbus, nfds, &readfds, &writefds, &exceptfds);
+    nfds = dbus_pre_select(nfds, &readfds, &writefds, &exceptfds);
     ret = select(nfds, &readfds, &writefds, &exceptfds, NULL);
-    xcdbus_post_select(g_xcbus, nfds, &readfds, &writefds, &exceptfds);
+    dbus_post_select(nfds, &readfds, &writefds, &exceptfds);
+
     if (ret > 0 && FD_ISSET(udevfd, &readfds))
       udev_event();
+
+    if (ret > 0 && FD_ISSET(xsfd, &readfds))
+      xenstore_event();
   }
 
   /* In the future, the while loop may break on critical error,

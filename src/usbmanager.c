@@ -41,6 +41,10 @@ void usbmanager_device_added(device_t *device)
 {
   int dev_id;
 
+  if (g_xcbus == NULL) {
+    return;
+  }
+
   dev_id = device_make_id(device->busid, device->devid);
   notify_com_citrix_xenclient_usbdaemon_device_added(g_xcbus,
                                                      USBDAEMON,
@@ -60,6 +64,10 @@ void usbmanager_device_added(device_t *device)
  */
 void usbmanager_device_removed(void)
 {
+  if (g_xcbus == NULL) {
+    return;
+  }
+
   notify_com_citrix_xenclient_usbdaemon_devices_changed(g_xcbus,
 							USBDAEMON,
 							USBDAEMON_OBJ);

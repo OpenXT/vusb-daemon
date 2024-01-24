@@ -820,7 +820,10 @@ xsdev_add(char *path)
 #define xs_read_int(v) { \
   char *_path = xasprintf("%s/%s", path, #v); \
   char *_p = xs_read(xs_handle, t, _path, &len); \
-  v = strtol(_p, NULL, 0); \
+  if (_p) \
+    v = strtol(_p, NULL, 0); \
+  else \
+    v = 0; \
   free(_p); \
   free(_path); }
 
@@ -862,6 +865,10 @@ xsdev_add(char *path)
       busid == 0 ||
       devid == 0) {
     xd_log(LOG_ERR, "%s: skipping invalid device", __func__);
+    free(shortname);
+    free(longname);
+    free(sysname);
+    free(serial);
     return;
   }
 

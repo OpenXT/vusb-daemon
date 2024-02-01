@@ -37,6 +37,7 @@ enum command {
   ALWAYS,                 /**< Always plug device to VM. implies ALLOW */
   DEFAULT,                /**< Plug device to VM by default, implies ALLOW */
   ALLOW,                  /**< Allow device to be plugged to VM */
+  RUNNING,                /**< Plug device into running VM */
   DENY,                   /**< Deny device to be plugged to VM */
   UNKNOWN                 /**< Unknown command, usually due to input parsing */
 };
